@@ -3,8 +3,8 @@ import re
 from pathlib import Path
 from collections import Counter
 
-monoBehaviourPath = Path(r"C:\Users\Ghost-Tales\Desktop\hell clock scripts v2\json_data\monoBehaviour.json")
-guidLookupPath = Path(r"C:\Users\Ghost-Tales\Desktop\hell clock scripts v2\json_data\guid_lookup.json")
+monoBehaviourPath = Path(r"json_data\monoBehaviour.json")
+guidLookupPath = Path(r"json_data\guid_lookup.json")
 
 used_monobehaviours = []
 
@@ -309,7 +309,7 @@ def dropbalance_class_formater():
 if __name__ == "__main__":
     data, used_monos = dropbalance_class_formater()
     used_monobehaviours.append(used_monos)
-    
+
     #print(json.dumps(data, indent=4))
     with open("json_data/dropbalance_data.json", "w") as json_file:
         json.dump(data, json_file, indent=4, allow_nan=False, separators=(',', ':'), ensure_ascii=False)
