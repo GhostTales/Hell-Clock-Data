@@ -62,7 +62,7 @@ def dropbalance_class_formater():
     monoList = find_dropbalance_classes(monoBehaviours)
     formattet_list = []
 
-    def format_child_treasure_class(monobehaviour, parent_expected_drop_amount = 1):
+    def format_child_treasure_class(monobehaviour, parent_expected_drop_amount = 1, parent_drop_chance = 1):
         if monobehaviour not in used_monobehaviours:
             used_monobehaviours.append(monobehaviour)
 
@@ -70,6 +70,7 @@ def dropbalance_class_formater():
         amount = monobehaviour.get("_amount")
         weights = []
         sub_treasure = {}
+        found_pattern = None
 
         tiers = (monobehaviour.get("_tiers").get("_list") if monobehaviour.get("_tiers") else None)
         relic_keys = [
@@ -147,6 +148,7 @@ def dropbalance_class_formater():
         for key, value in monobehaviour.items():
             if not pattern.search(key):
                 continue
+            found_pattern = key
 
             for i in monobehaviour.get(key).get("_list"):
                 weights.append(i.get("_weight"))
@@ -179,9 +181,10 @@ def dropbalance_class_formater():
                     sub_treasure_name += " Fragment"
 
                 # might be right idk anymore
-                expected_drop_amount = weight / sum(weights) * (amount or 1) * parent_expected_drop_amount
+                expected_drop_amount = weight / sum(weights) * (amount or 1) * (multiplier or 1) * parent_expected_drop_amount
+                drop_chance = weight / sum(weights) * parent_drop_chance
 
-                sub_treasure_child = format_child_treasure_class(sub_treasure_mono, expected_drop_amount)
+                sub_treasure_child = format_child_treasure_class(sub_treasure_mono, expected_drop_amount, drop_chance)
 
                 sub_treasure_child_weights = []
                 for inner_dict in sub_treasure_child.values():
@@ -198,9 +201,11 @@ def dropbalance_class_formater():
                     **({"_rollMin": roll_min} if roll_min is not None else {}),
                     **({"_rollMax": roll_max} if roll_max is not None else {}),
                     **({"_expectedDropAmount": expected_drop_amount} if expected_drop_amount is not None else {}),
+                    **({"_dropChance": drop_chance} if drop_chance is not None else {}),
+                    **({"_dropChance": drop_chance} if drop_chance is not None else {}),
                     **({"_devotionAffinity": devotionAffinity} if devotionAffinity is not None else {}),
-                    **({"_childTreasureTotalWeight": sum(sub_treasure_child_weights)} if sub_treasure_child and sum(sub_treasure_child_weights) != 0 else {}),
-                    **({key: sub_treasure_child} if sub_treasure_child is not None else {}),
+                    #**({"_childTreasureTotalWeight": sum(sub_treasure_child_weights)} if sub_treasure_child and sum(sub_treasure_child_weights) != 0 else {}),
+                    **({key: sub_treasure_child} if sub_treasure_child and not multiplier else {}),
                 }
 
         formatted_child = {
@@ -209,7 +214,7 @@ def dropbalance_class_formater():
             **({"_childTreasureTotalWeight": sum(weights)} if len(weights) != 0 else {}),
             **({"_uniqueRelicTreasureClass": unique_relic_treasure_child} if unique_relic_treasure_child else {}),
             **({"_relicTiers" : tiers} if tiers else {}),
-            **sub_treasure,
+            **({found_pattern: sub_treasure} if sub_treasure else {}),
         }
 
         return formatted_child
@@ -264,16 +269,15 @@ def dropbalance_class_formater():
 
         base_group = {}
         for name in shared_names:
-
             base_group[name] = next(
                 tc_dict[name] for tc_dict in floors.values() if name in tc_dict
-            )
+            ).copy()
 
 
         floor_overrides = {}
         for floor, tc_dict in floors.items():
             overrides = {
-                name: data
+                name: data.copy()
                 for name, data in tc_dict.items()
                 if name not in shared_names
             }
