@@ -1,6 +1,7 @@
 import json
 import re
 from pathlib import Path
+from collections import Counter
 
 monoBehaviourPath = Path(r"C:\Users\Ghost-Tales\Desktop\hell clock scripts v2\json_data\monoBehaviour.json")
 guidLookupPath = Path(r"C:\Users\Ghost-Tales\Desktop\hell clock scripts v2\json_data\guid_lookup.json")
@@ -218,13 +219,13 @@ def dropbalance_class_formater():
             r'_[A-Za-z]+TreasureClass|_lootGoblinDropTable|_blessedGearShopDefinition$'
         )
 
-        # step 1: collect per-floor treasure classes
+
         floors = {}
         for config in drop_config:
             tc_dict = {}
 
             for key, value in config.items():
-                # Handle chest treasure class separately
+                # Handle chest treasure class
                 if key == "_chestTreasureClass":
                     for entry in value.get("_serializedList", []):
                         guid = entry.get("Value", {}).get("guid")
@@ -233,9 +234,9 @@ def dropbalance_class_formater():
                         name = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[guid])
                         mono = find_monobehavior_by_name(name)
                         tc_dict[name] = format_child_treasure_class(mono)
-                    continue  # skip the rest of this loop iteration
+                    continue
 
-                # Existing logic for other treasure classes
+                # logic for other treasure classes
                 if not pattern.search(key):
                     continue
 
@@ -249,9 +250,6 @@ def dropbalance_class_formater():
 
             floors[f"_floor{config.get('_floor')}"] = tc_dict
 
-        # step 2: find shared treasure classes
-        from collections import Counter
-
         usage = Counter()
         for tc_dict in floors.values():
             usage.update(tc_dict.keys())
@@ -262,15 +260,13 @@ def dropbalance_class_formater():
             if count >= COMMON_THRESHOLD
         }
 
-        # step 3: build base group
+
         base_group = {}
         for name in shared_names:
-            # safe because all shared entries are identical by construction
             base_group[name] = next(
                 tc_dict[name] for tc_dict in floors.values() if name in tc_dict
             )
 
-        # step 4: subtract base from floors
         floor_overrides = {}
         for floor, tc_dict in floors.items():
             overrides = {
@@ -313,6 +309,7 @@ def dropbalance_class_formater():
 if __name__ == "__main__":
     data, used_monos = dropbalance_class_formater()
     used_monobehaviours.append(used_monos)
+    
     #print(json.dumps(data, indent=4))
     with open("json_data/dropbalance_data.json", "w") as json_file:
         json.dump(data, json_file, indent=4, allow_nan=False, separators=(',', ':'), ensure_ascii=False)

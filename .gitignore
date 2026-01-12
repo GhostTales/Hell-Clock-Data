@@ -180,3 +180,4 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 /json_data/scene_data
+/.idea
