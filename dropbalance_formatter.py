@@ -225,7 +225,7 @@ def dropbalance_class_formater():
             tc_dict = {}
 
             for key, value in config.items():
-                # Handle chest treasure class
+                # Handle chest treasure class separately
                 if key == "_chestTreasureClass":
                     for entry in value.get("_serializedList", []):
                         guid = entry.get("Value", {}).get("guid")
@@ -250,11 +250,12 @@ def dropbalance_class_formater():
 
             floors[f"_floor{config.get('_floor')}"] = tc_dict
 
+
         usage = Counter()
         for tc_dict in floors.values():
             usage.update(tc_dict.keys())
 
-        COMMON_THRESHOLD = len(floors)  # appears in all floors
+        COMMON_THRESHOLD = len(floors)
         shared_names = {
             name for name, count in usage.items()
             if count >= COMMON_THRESHOLD
@@ -263,9 +264,11 @@ def dropbalance_class_formater():
 
         base_group = {}
         for name in shared_names:
+
             base_group[name] = next(
                 tc_dict[name] for tc_dict in floors.values() if name in tc_dict
             )
+
 
         floor_overrides = {}
         for floor, tc_dict in floors.items():
@@ -310,7 +313,6 @@ if __name__ == "__main__":
     data, used_monos = dropbalance_class_formater()
     used_monobehaviours.append(used_monos)
 
-    #print(json.dumps(data, indent=4))
     with open("json_data/dropbalance_data.json", "w") as json_file:
         json.dump(data, json_file, indent=4, allow_nan=False, separators=(',', ':'), ensure_ascii=False)
     with open("json_data/dropbalance_monobehaviours.json", "w") as json_file:
