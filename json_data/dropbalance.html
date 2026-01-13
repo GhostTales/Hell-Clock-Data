@@ -5,44 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Drop Balance Calculator</title>
     <style>
+        /* Adopted Design System from index.html */
         :root {
-            --bg-color: #1e1e1e;
-            --sidebar-bg: #252526;
-            --text-color: #d4d4d4;
-            --accent-color: #007acc;
-            --border-color: #3e3e42;
-            --input-bg: #3c3c3c;
+            --bg: #0d1117; 
+            --card-bg: #161b22; 
+            --text-main: #c9d1d9; 
+            --text-muted: #8b949e; 
+            --accent: #58a6ff; 
+            --border: #30363d; 
+            --input-bg: #0d1117;
+            --hover-bg: rgba(110, 118, 129, 0.1);
             --header-height: 60px;
         }
 
         body {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
             display: flex;
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
+            line-height: 1.5;
         }
 
         /* Header */
         header {
             height: var(--header-height);
-            background-color: #333333;
+            background-color: var(--card-bg);
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 20px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
             flex-shrink: 0;
         }
 
-        h1 { margin: 0; font-size: 1.2rem; }
+        h1 { 
+            margin: 0; 
+            font-size: 1.2rem; 
+            color: var(--text-main); 
+            font-weight: 600;
+        }
         
         #status {
-            font-size: 0.9rem;
-            color: #888;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: monospace;
         }
 
         /* Layout */
@@ -55,8 +65,8 @@
         /* Sidebar */
         .sidebar {
             width: 250px;
-            background-color: var(--sidebar-bg);
-            border-right: 1px solid var(--border-color);
+            background-color: var(--bg);
+            border-right: 1px solid var(--border);
             overflow-y: auto;
             flex-shrink: 0;
         }
@@ -64,12 +74,23 @@
         .sidebar-item {
             padding: 10px 20px;
             cursor: pointer;
-            border-bottom: 1px solid #333;
-            transition: background 0.2s;
+            border-bottom: 1px solid var(--border);
+            transition: 0.2s ease-in-out;
+            font-size: 0.95rem;
+            color: var(--text-muted);
         }
 
-        .sidebar-item:hover { background-color: #37373d; }
-        .sidebar-item.active { background-color: var(--accent-color); color: white; }
+        .sidebar-item:hover { 
+            background-color: var(--hover-bg); 
+            color: var(--text-main);
+        }
+        
+        .sidebar-item.active { 
+            background-color: var(--card-bg); 
+            color: var(--accent); 
+            border-left: 3px solid var(--accent);
+            padding-left: 17px; /* adjusting for border width */
+        }
 
         /* Main Content */
         .main-content {
@@ -77,6 +98,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            background-color: var(--bg);
         }
 
         .panels {
@@ -89,80 +111,86 @@
             width: 40%;
             padding: 20px;
             overflow-y: auto;
-            border-right: 1px solid var(--border-color);
+            border-right: 1px solid var(--border);
+            background-color: var(--bg);
         }
 
         .result-panel {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
-            background-color: #1e1e1e;
+            background-color: var(--bg);
         }
 
         /* Group Styling */
         .group-header {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-transform: uppercase;
-            color: #888;
+            color: var(--text-muted);
             margin-top: 20px;
             margin-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
             padding-bottom: 5px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
         }
 
-        /* Accordions */
+        /* Accordions / Cards */
         .floor-container {
-            margin-bottom: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background-color: #252526;
+            margin-bottom: 15px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background-color: var(--card-bg);
             overflow: hidden;
         }
 
         .accordion-header {
             width: 100%;
-            padding: 10px 15px;
-            background-color: #2d2d2d;
+            padding: 12px 15px;
+            background-color: var(--card-bg);
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-weight: bold;
-            color: var(--accent-color);
+            font-weight: 600;
+            color: var(--accent);
             user-select: none;
             transition: background 0.2s;
+            box-sizing: border-box;
         }
-        .accordion-header:hover { background-color: #383838; }
-        .accordion-header.active { border-bottom: 1px solid var(--border-color); }
+        .accordion-header:hover { background-color: var(--hover-bg); }
+        .accordion-header.active { border-bottom: 1px solid var(--border); }
+        
         .accordion-header .arrow::after {
             content: '▼';
             font-size: 0.8em;
             display: inline-block;
             transition: transform 0.2s;
-            color: #888;
+            color: var(--text-muted);
         }
         .accordion-header:not(.active) .arrow::after { transform: rotate(-90deg); }
-        .accordion-content { display: none; padding: 10px; }
+        .accordion-content { display: none; padding: 15px; }
         .accordion-content.active { display: block; }
 
         /* Goblin Group */
         .goblin-group {
             margin-bottom: 8px;
-            background: #2d2d2d;
-            border-radius: 4px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
             overflow: hidden;
         }
         .goblin-header {
             display: flex;
             align-items: center;
-            padding: 8px;
+            padding: 10px;
             cursor: pointer;
             user-select: none;
         }
-        .goblin-header:hover { background-color: #383838; }
+        .goblin-header:hover { background-color: var(--hover-bg); }
         .goblin-toggle {
             margin-right: 10px;
-            color: #888;
+            color: var(--text-muted);
             font-size: 0.8em;
             width: 15px;
             text-align: center;
@@ -170,13 +198,13 @@
         }
         .goblin-group.open .goblin-toggle { transform: rotate(90deg); }
         .goblin-toggle::after { content: '▶'; }
-        .goblin-label { flex: 1; font-size: 0.9rem; color: #e0e0e0; }
-        .goblin-avg-label { font-size: 0.75rem; color: #888; margin-right: 10px; font-style: italic; }
+        .goblin-label { flex: 1; font-size: 0.9rem; color: var(--text-main); font-weight: 500; }
+        .goblin-avg-label { font-size: 0.75rem; color: var(--text-muted); margin-right: 10px; }
         .goblin-body {
             display: none;
-            padding: 10px 10px 10px 30px;
-            border-top: 1px solid #3e3e42;
-            background-color: #252526;
+            padding: 10px 10px 10px 20px;
+            border-top: 1px solid var(--border);
+            background-color: rgba(110, 118, 129, 0.05); /* Slight tint for nested content */
         }
         .goblin-group.open .goblin-body { display: block; }
 
@@ -186,25 +214,56 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
-            background: #2d2d2d;
-            padding: 8px;
-            border-radius: 4px;
+            padding: 6px 0;
         }
-        .control-label { font-size: 0.9rem; flex: 1; margin-right: 10px; word-break: break-word; }
+        .control-label { font-size: 0.9rem; flex: 1; margin-right: 10px; word-break: break-word; color: var(--text-main); }
+        
         input[type="number"] {
             background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: white;
-            padding: 4px;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 5px 8px;
             width: 80px;
-            border-radius: 3px;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+        input[type="number"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
         }
 
         /* Table */
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); }
-        th { position: sticky; top: 0; background-color: #1e1e1e; color: var(--accent-color); }
-        tr:hover { background-color: #2a2a2a; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
+        
+        th { 
+            text-align: left; 
+            padding: 12px; 
+            border-bottom: 1px solid var(--border); 
+            background-color: var(--bg); 
+            color: var(--text-muted);
+            font-weight: 600;
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+        }
+        
+        td { 
+            text-align: left; 
+            padding: 12px; 
+            border-bottom: 1px solid var(--border); 
+            color: var(--text-main);
+        }
+        
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background-color: var(--card-bg); }
+
+        /* Scrollbar styling to match dark theme */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--border); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid var(--bg); }
+        ::-webkit-scrollbar-thumb:hover { background: #565e68; }
+
     </style>
 </head>
 <body>
@@ -219,7 +278,7 @@
     <div class="main-content">
         <div class="panels">
             <div class="input-panel" id="inputPanel">
-                <div style="color:#666; font-style:italic;">Select an Act from the sidebar.</div>
+                <div style="color: var(--text-muted); font-style:italic; padding: 10px;">Select an Act from the sidebar.</div>
             </div>
             <div class="result-panel" id="resultPanel">
                 <table id="resultTable">
@@ -252,13 +311,13 @@
             })
             .then(data => {
                 rawData = data;
-                statusEl.textContent = "Data loaded successfully";
-                statusEl.style.color = "#4caf50";
+                statusEl.textContent = "Data loaded";
+                statusEl.style.color = "var(--text-muted)"; // Using var for consistency
                 setTimeout(() => initProcessor(), 10);
             })
             .catch(err => {
                 console.error(err);
-                statusEl.innerHTML = `<span style="color:red">Error loading data. Ensure <b>dropbalance_data.json</b> is in the same folder.</span>`;
+                statusEl.innerHTML = `<span style="color:#ff7b72">Error loading data.</span>`;
             });
     });
 
@@ -401,16 +460,11 @@
 
   
     /**
-     * RECURSIVE FLATTENER (Refactored)
-     * Prioritizes diving into Containers (Treasure Classes) over listing them as items.
-     * Identifies "Container" nodes by their keys and skips adding them to the drop list,
-     * allowing the recursion to find the actual items inside.
+     * RECURSIVE FLATTENER
      */
     function getDropVector(rootObj) {
         let totals = {};
         
-        // Keys that imply this node is a container/wrapper, not a final item.
-        // If a node has these, we assume it's a box and we want the contents, not the box.
         const containerIndicators = [
             '_availableTreasureClasses', 
             '_availableRelics', 
@@ -422,32 +476,19 @@
         function traverse(node, inferredName) {
             if (!node || typeof node !== 'object') return;
 
-            // 1. Determine if this node is acting as a Container
             const isContainer = containerIndicators.some(k => k in node);
 
-            // 2. Identify if it's an Item (has drop amount) and NOT a container
-            // We skip adding it if it's a container because we want to see the items INSIDE it.
             if (!isContainer && typeof node._expectedDropAmount === 'number') {
                 const name = node._name || inferredName || "Unknown Item";
                 totals[name] = (totals[name] || 0) + node._expectedDropAmount;
             }
 
-            // 3. Universal Recursion
-            // Dive into ALL object children to find hidden items.
             Object.entries(node).forEach(([key, value]) => {
                 if (typeof value !== 'object' || value === null) return;
-
-                // Determine the name to pass down
                 let nextName = null;
-                
-                // If the key is NOT a system key (doesn't start with _), it's likely an identifier/name
-                // (e.g. "Sword", "Act 1 Relic TC").
-                // If it IS a system key (e.g. "_availableRelics", "_uniqueRelicTreasureClass"),
-                // we pass null so the child doesn't inherit a system name.
                 if (!key.startsWith('_')) {
                     nextName = key;
                 } 
-                
                 traverse(value, nextName);
             });
         }
@@ -482,7 +523,7 @@
             h.textContent = 'Common / Global';
             panel.appendChild(h);
             const container = document.createElement('div');
-            container.style.padding = '0 5px';
+            // Remove inline padding to align with new clean look
             commonInputs.forEach(item => {
                 if(item.isGoblin) renderGoblinGroup(container, item);
                 else createInputRow(container, item.name, item, null);
@@ -537,7 +578,7 @@
 
         const avgLabel = document.createElement('span');
         avgLabel.className = 'goblin-avg-label';
-        avgLabel.textContent = "Rolls (Avg):";
+        avgLabel.textContent = "Avg Rolls:";
         header.appendChild(avgLabel);
 
         const avgInput = document.createElement('input');
@@ -642,16 +683,15 @@
 
         if (sorted.length === 0) {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="2" style="text-align:center; color:#666;">No drops calculated. Set multipliers to start.</td>`;
+            tr.innerHTML = `<td colspan="2" style="text-align:center; color:var(--text-muted); padding:30px;">No drops calculated. Set multipliers to start.</td>`;
             tbody.appendChild(tr);
             return;
         }
 
         sorted.forEach(([name, count]) => {
-            // Modified to always display up to 20 decimal places, preventing scientific notation
             let displayCount = count.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 });
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${name}</td><td style="color: #007acc; font-weight:bold;">${displayCount}</td>`;
+            tr.innerHTML = `<td>${name}</td><td style="color: var(--accent); font-weight:bold;">${displayCount}</td>`;
             tbody.appendChild(tr);
         });
     }
