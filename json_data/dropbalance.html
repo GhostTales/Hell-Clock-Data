@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drop Balance Calculator</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --sidebar-bg: #252526;
+            --text-color: #d4d4d4;
+            --accent-color: #007acc;
+            --border-color: #3e3e42;
+            --input-bg: #3c3c3c;
+            --header-height: 60px;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            height: var(--header-height);
+            background-color: #333333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; }
+        
+        #status {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            transition: background 0.2s;
+        }
+
+        .sidebar-item:hover { background-color: #37373d; }
+        .sidebar-item.active { background-color: var(--accent-color); color: white; }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panels {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .input-panel {
+            width: 40%;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .result-panel {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+        }
+
+        /* Group Styling */
+        .group-header {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: #888;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+
+        /* Accordions */
+        .floor-container {
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #252526;
+            overflow: hidden;
+        }
+
+        .accordion-header {
+            width: 100%;
+            padding: 10px 15px;
+            background-color: #2d2d2d;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: var(--accent-color);
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .accordion-header:hover { background-color: #383838; }
+        .accordion-header.active { border-bottom: 1px solid var(--border-color); }
+        .accordion-header .arrow::after {
+            content: '▼';
+            font-size: 0.8em;
+            display: inline-block;
+            transition: transform 0.2s;
+            color: #888;
+        }
+        .accordion-header:not(.active) .arrow::after { transform: rotate(-90deg); }
+        .accordion-content { display: none; padding: 10px; }
+        .accordion-content.active { display: block; }
+
+        /* Goblin Group */
+        .goblin-group {
+            margin-bottom: 8px;
+            background: #2d2d2d;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .goblin-header {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .goblin-header:hover { background-color: #383838; }
+        .goblin-toggle {
+            margin-right: 10px;
+            color: #888;
+            font-size: 0.8em;
+            width: 15px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .goblin-group.open .goblin-toggle { transform: rotate(90deg); }
+        .goblin-toggle::after { content: '▶'; }
+        .goblin-label { flex: 1; font-size: 0.9rem; color: #e0e0e0; }
+        .goblin-avg-label { font-size: 0.75rem; color: #888; margin-right: 10px; font-style: italic; }
+        .goblin-body {
+            display: none;
+            padding: 10px 10px 10px 30px;
+            border-top: 1px solid #3e3e42;
+            background-color: #252526;
+        }
+        .goblin-group.open .goblin-body { display: block; }
+
+        /* Inputs */
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            background: #2d2d2d;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .control-label { font-size: 0.9rem; flex: 1; margin-right: 10px; word-break: break-word; }
+        input[type="number"] {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 4px;
+            width: 80px;
+            border-radius: 3px;
+        }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); }
+        th { position: sticky; top: 0; background-color: #1e1e1e; color: var(--accent-color); }
+        tr:hover { background-color: #2a2a2a; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Drop Balance Calculator</h1>
+    <div id="status">Loading data...</div>
+</header>
+
+<div class="container">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main-content">
+        <div class="panels">
+            <div class="input-panel" id="inputPanel">
+                <div style="color:#666; font-style:italic;">Select an Act from the sidebar.</div>
+            </div>
+            <div class="result-panel" id="resultPanel">
+                <table id="resultTable">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Total Expected Drops</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let rawData = [];
+    let processedData = {}; 
+    let currentSelection = null;
+    let inputState = {}; 
+
+    // --- 1. Data Loading ---
+    window.addEventListener('DOMContentLoaded', () => {
+        const statusEl = document.getElementById('status');
+        fetch('dropbalance_data.json')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                rawData = data;
+                statusEl.textContent = "Data loaded successfully";
+                statusEl.style.color = "#4caf50";
+                setTimeout(() => initProcessor(), 10);
+            })
+            .catch(err => {
+                console.error(err);
+                statusEl.innerHTML = `<span style="color:red">Error loading data. Ensure <b>dropbalance_data.json</b> is in the same folder.</span>`;
+            });
+    });
+
+    // --- 2. Processing ---
+    function initProcessor() {
+        processedData = {};
+        const sidebar = document.getElementById('sidebar');
+        sidebar.innerHTML = '';
+
+        rawData.forEach((act, index) => {
+            const actName = act._name || `Act ${index + 1}`;
+            
+            const goldFirst = act._goldDropFirstFloorValue || 1;
+            const goldLast = act._goldDropLastFloorValue || 1;
+
+            let maxFloor = 0;
+            if (act._floorDropConfigs && act._floorDropConfigs._floors) {
+                const floorKeys = Object.keys(act._floorDropConfigs._floors);
+                floorKeys.forEach(k => {
+                    const num = parseInt(k.replace('_floor', ''), 10);
+                    if (!isNaN(num) && num > maxFloor) maxFloor = num;
+                });
+            }
+
+            processedData[actName] = { 
+                raw: act, 
+                inputs: [],
+                goldSettings: { first: goldFirst, last: goldLast, maxFloor: maxFloor }
+            };
+
+            const div = document.createElement('div');
+            div.className = 'sidebar-item';
+            div.textContent = actName;
+            div.onclick = () => selectAct(actName);
+            sidebar.appendChild(div);
+
+            if (act._floorDropConfigs) {
+                const commonGoldScale = (goldFirst + goldLast) / 2;
+
+                if (act._floorDropConfigs._base_groups && act._floorDropConfigs._base_groups.COMMON) {
+                    for (const [key, val] of Object.entries(act._floorDropConfigs._base_groups.COMMON)) {
+                        if (isGoblinTable(val)) {
+                            processedData[actName].inputs.push(processGoblinTable(key, val, 'COMMON', null, commonGoldScale));
+                        } else {
+                            processedData[actName].inputs.push({
+                                type: 'COMMON',
+                                name: key,
+                                drops: getDropVector(val),
+                                goldScale: commonGoldScale
+                            });
+                        }
+                    }
+                }
+                
+                if (act._floorDropConfigs._floors) {
+                    for (const [floorKey, floorVal] of Object.entries(act._floorDropConfigs._floors)) {
+                        
+                        const floorNum = parseInt(floorKey.replace('_floor', ''), 10) || 0;
+                        const t = maxFloor > 0 ? (floorNum / maxFloor) : 0;
+                        const floorGoldScale = goldFirst + (goldLast - goldFirst) * t;
+
+                        if (floorVal._add) {
+                            for (const [key, val] of Object.entries(floorVal._add)) {
+                                if (isGoblinTable(val)) {
+                                    processedData[actName].inputs.push(processGoblinTable(key, val, 'FLOOR', floorKey, floorGoldScale));
+                                } else {
+                                    processedData[actName].inputs.push({
+                                        type: 'FLOOR',
+                                        group: floorKey,
+                                        name: key,
+                                        drops: getDropVector(val),
+                                        goldScale: floorGoldScale
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function isGoblinTable(node) {
+        return node && node['null'] && node['null']._deathTreasureClassPerType;
+    }
+
+    function processGoblinTable(name, node, contextType, groupKey = null, goldScale = 1) {
+        const config = node['null']._deathTreasureClassPerType;
+        const baseGroups = config._base_groups || {};
+        const types = config._types || {};
+        const subInputs = [];
+        let grandTotalVector = {};
+        let typeCount = 0;
+
+        for (const [typeKey, typeDef] of Object.entries(types)) {
+            let combinedDrops = {};
+            const baseName = typeDef._base;
+            if (baseName && baseGroups[baseName]) {
+                for (const itemNode of Object.values(baseGroups[baseName])) {
+                    mergeVectors(combinedDrops, getDropVector(itemNode));
+                }
+            }
+            if (typeDef._add) {
+                for (const itemNode of Object.values(typeDef._add)) {
+                    mergeVectors(combinedDrops, getDropVector(itemNode));
+                }
+            }
+            subInputs.push({
+                idSuffix: `Type_${typeKey}`,
+                name: `Type ${typeKey}`,
+                drops: combinedDrops
+            });
+            mergeVectors(grandTotalVector, combinedDrops);
+            typeCount++;
+        }
+
+        const averageDrops = {};
+        if (typeCount > 0) {
+            for (const [item, qty] of Object.entries(grandTotalVector)) {
+                averageDrops[item] = qty / typeCount;
+            }
+        }
+
+        return {
+            isGoblin: true,
+            type: contextType,
+            group: groupKey,
+            name: name,
+            averageDrops: averageDrops,
+            subInputs: subInputs,
+            goldScale: goldScale
+        };
+    }
+
+    function mergeVectors(target, source) {
+        for (const [key, val] of Object.entries(source)) {
+            target[key] = (target[key] || 0) + val;
+        }
+    }
+
+  
+    /**
+     * RECURSIVE FLATTENER (Refactored)
+     * Prioritizes diving into Containers (Treasure Classes) over listing them as items.
+     * Identifies "Container" nodes by their keys and skips adding them to the drop list,
+     * allowing the recursion to find the actual items inside.
+     */
+    function getDropVector(rootObj) {
+        let totals = {};
+        
+        // Keys that imply this node is a container/wrapper, not a final item.
+        // If a node has these, we assume it's a box and we want the contents, not the box.
+        const containerIndicators = [
+            '_availableTreasureClasses', 
+            '_availableRelics', 
+            '_availableGear', 
+            '_availableCurrencies',
+            '_uniqueRelicTreasureClass'
+        ];
+
+        function traverse(node, inferredName) {
+            if (!node || typeof node !== 'object') return;
+
+            // 1. Determine if this node is acting as a Container
+            const isContainer = containerIndicators.some(k => k in node);
+
+            // 2. Identify if it's an Item (has drop amount) and NOT a container
+            // We skip adding it if it's a container because we want to see the items INSIDE it.
+            if (!isContainer && typeof node._expectedDropAmount === 'number') {
+                const name = node._name || inferredName || "Unknown Item";
+                totals[name] = (totals[name] || 0) + node._expectedDropAmount;
+            }
+
+            // 3. Universal Recursion
+            // Dive into ALL object children to find hidden items.
+            Object.entries(node).forEach(([key, value]) => {
+                if (typeof value !== 'object' || value === null) return;
+
+                // Determine the name to pass down
+                let nextName = null;
+                
+                // If the key is NOT a system key (doesn't start with _), it's likely an identifier/name
+                // (e.g. "Sword", "Act 1 Relic TC").
+                // If it IS a system key (e.g. "_availableRelics", "_uniqueRelicTreasureClass"),
+                // we pass null so the child doesn't inherit a system name.
+                if (!key.startsWith('_')) {
+                    nextName = key;
+                } 
+                
+                traverse(value, nextName);
+            });
+        }
+
+        traverse(rootObj, null);
+        return totals;
+    }
+
+    // --- 3. UI Logic ---
+    function selectAct(name) {
+        currentSelection = processedData[name];
+        inputState = {}; 
+        document.querySelectorAll('.sidebar-item').forEach(el => {
+            el.classList.toggle('active', el.textContent === name);
+        });
+        renderInputs();
+        calculate();
+    }
+
+    function renderInputs() {
+        const panel = document.getElementById('inputPanel');
+        panel.innerHTML = '';
+        if (!currentSelection) return;
+
+        const inputs = currentSelection.inputs;
+        const commonInputs = inputs.filter(i => i.type === 'COMMON');
+        const floorInputs = inputs.filter(i => i.type === 'FLOOR');
+
+        if (commonInputs.length > 0) {
+            const h = document.createElement('div');
+            h.className = 'group-header';
+            h.textContent = 'Common / Global';
+            panel.appendChild(h);
+            const container = document.createElement('div');
+            container.style.padding = '0 5px';
+            commonInputs.forEach(item => {
+                if(item.isGoblin) renderGoblinGroup(container, item);
+                else createInputRow(container, item.name, item, null);
+            });
+            panel.appendChild(container);
+        }
+
+        if (floorInputs.length > 0) {
+            const floors = {};
+            floorInputs.forEach(i => {
+                if (!floors[i.group]) floors[i.group] = [];
+                floors[i.group].push(i);
+            });
+            for (const [floorName, items] of Object.entries(floors)) {
+                const displayName = floorName.replace('_', ' ').toUpperCase();
+                const floorContainer = document.createElement('div');
+                floorContainer.className = 'floor-container';
+                const header = document.createElement('div');
+                header.className = 'accordion-header';
+                header.innerHTML = `<span>${displayName}</span><span class="arrow"></span>`;
+                const content = document.createElement('div');
+                content.className = 'accordion-content';
+                header.onclick = () => {
+                    header.classList.toggle('active');
+                    content.classList.toggle('active');
+                };
+                items.forEach(item => {
+                    if(item.isGoblin) renderGoblinGroup(content, item);
+                    else createInputRow(content, item.name, item, null);
+                });
+                floorContainer.appendChild(header);
+                floorContainer.appendChild(content);
+                panel.appendChild(floorContainer);
+            }
+        }
+    }
+
+    function renderGoblinGroup(container, itemData) {
+        const group = document.createElement('div');
+        group.className = 'goblin-group';
+        const header = document.createElement('div');
+        header.className = 'goblin-header';
+        
+        const toggle = document.createElement('div');
+        toggle.className = 'goblin-toggle';
+        header.appendChild(toggle);
+
+        const label = document.createElement('span');
+        label.className = 'goblin-label';
+        label.textContent = itemData.name;
+        header.appendChild(label);
+
+        const avgLabel = document.createElement('span');
+        avgLabel.className = 'goblin-avg-label';
+        avgLabel.textContent = "Rolls (Avg):";
+        header.appendChild(avgLabel);
+
+        const avgInput = document.createElement('input');
+        avgInput.type = 'number';
+        avgInput.min = 0;
+        avgInput.value = 0;
+        const avgId = `GOBLIN_AVG::${itemData.type}::${itemData.group||''}::${itemData.name}`;
+        if(inputState[avgId]) avgInput.value = inputState[avgId];
+
+        avgInput.addEventListener('input', (e) => {
+            inputState[avgId] = parseFloat(e.target.value) || 0;
+            calculate();
+        });
+        avgInput.addEventListener('click', (e) => e.stopPropagation());
+
+        header.appendChild(avgInput);
+        header.onclick = () => group.classList.toggle('open');
+
+        const body = document.createElement('div');
+        body.className = 'goblin-body';
+        itemData.subInputs.forEach(sub => {
+            const subId = `GOBLIN_SUB::${itemData.type}::${itemData.group||''}::${itemData.name}::${sub.idSuffix}`;
+            createInputRow(body, sub.name, null, subId);
+        });
+
+        group.appendChild(header);
+        group.appendChild(body);
+        container.appendChild(group);
+    }
+
+    function createInputRow(container, labelText, itemDataObj, manualId) {
+        const row = document.createElement('div');
+        row.className = 'control-row';
+        const label = document.createElement('span');
+        label.className = 'control-label';
+        label.textContent = labelText;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = 0;
+        input.value = 0; 
+        
+        let id;
+        if (manualId) id = manualId;
+        else id = `${itemDataObj.type}::${itemDataObj.group || ""}::${itemDataObj.name}`;
+        
+        if (inputState[id]) input.value = inputState[id];
+        input.addEventListener('input', (e) => {
+            inputState[id] = parseFloat(e.target.value) || 0;
+            calculate();
+        });
+        row.appendChild(label);
+        row.appendChild(input);
+        container.appendChild(row);
+    }
+
+    // --- 4. Calculation ---
+    function calculate() {
+        if (!currentSelection) return;
+        const finalTotals = {};
+
+        const addToTotals = (drops, multiplier, goldScale) => {
+            for (const [rawName, dropRate] of Object.entries(drops)) {
+                let name = rawName;
+                let scale = 1;
+
+                if (name.includes("Gold")) {
+                    name = "Gold";
+                    scale = goldScale || 1; 
+                }
+                else if (name.includes("SoulStone")) name = "SoulStone";
+                else if (name.includes("Time")) name = "Time";
+
+                finalTotals[name] = (finalTotals[name] || 0) + (dropRate * multiplier * scale);
+            }
+        };
+
+        currentSelection.inputs.forEach(item => {
+            if (item.isGoblin) {
+                const avgId = `GOBLIN_AVG::${item.type}::${item.group||''}::${item.name}`;
+                const avgMult = inputState[avgId] || 0;
+                if (avgMult > 0) addToTotals(item.averageDrops, avgMult, item.goldScale);
+
+                item.subInputs.forEach(sub => {
+                    const subId = `GOBLIN_SUB::${item.type}::${item.group||''}::${item.name}::${sub.idSuffix}`;
+                    const subMult = inputState[subId] || 0;
+                    if (subMult > 0) addToTotals(sub.drops, subMult, item.goldScale);
+                });
+            } else {
+                const id = `${item.type}::${item.group || ""}::${item.name}`;
+                const multiplier = inputState[id] || 0;
+                if (multiplier > 0) addToTotals(item.drops, multiplier, item.goldScale);
+            }
+        });
+
+        renderTable(finalTotals);
+    }
+
+    function renderTable(data) {
+        const tbody = document.querySelector('#resultTable tbody');
+        tbody.innerHTML = '';
+        const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+
+        if (sorted.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="2" style="text-align:center; color:#666;">No drops calculated. Set multipliers to start.</td>`;
+            tbody.appendChild(tr);
+            return;
+        }
+
+        sorted.forEach(([name, count]) => {
+            // Modified to always display up to 20 decimal places, preventing scientific notation
+            let displayCount = count.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${name}</td><td style="color: #007acc; font-weight:bold;">${displayCount}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
+
+</body>
+</html>
