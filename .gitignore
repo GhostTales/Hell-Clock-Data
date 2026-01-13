@@ -181,3 +181,4 @@ cython_debug/
 .cursorindexingignore
 /json_data/scene_data
 /.idea
+index_generator.py
