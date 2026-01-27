@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relic Loadout Editor</title>
+    <style>
+        :root {
+            /* Theme matching index.html (GitHub Dark Dimmed style) */
+            --bg-color: #0d1117;
+            --panel-bg: #161b22;
+            --border-color: #30363d;
+            --text-color: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent-color: #58a6ff;
+            --input-bg: #0d1117;
+            
+            --grid-cell-size: 60px;
+            --slot-bg: #21262d;
+            --slot-blocked: #010409;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            line-height: 1.5;
+        }
+
+        /* Layout */
+        .header {
+            padding: 15px 20px;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .header h3 {
+            margin: 0;
+            color: var(--accent-color);
+            font-size: 1.2rem;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .editor-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #010409; /* Darker background for canvas */
+            position: relative;
+            overflow: auto;
+            background-image: radial-gradient(#21262d 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .properties-panel {
+            width: 420px;
+            background-color: var(--panel-bg);
+            border-left: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid var(--border-color);
+            margin: 15px 0;
+        }
+
+        /* Inputs & Status */
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--accent-color);
+            padding: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            text-align: center;
+            display: block;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+        
+        .file-upload-btn:hover {
+            border-color: var(--accent-color);
+        }
+        
+        .file-upload-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            color: var(--text-muted);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .status-pending { color: #d29922; } /* GitHub Warning Color */
+        .status-ok { color: #3fb950; }     /* GitHub Success Color */
+        .status-error { color: #f85149; }  /* GitHub Error Color */
+
+        /* Grid Visualization */
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(7, var(--grid-cell-size));
+            grid-template-rows: repeat(6, var(--grid-cell-size));
+            gap: 4px;
+            position: relative;
+            background-color: var(--bg-color);
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .grid-slot {
+            width: var(--grid-cell-size);
+            height: var(--grid-cell-size);
+            background-color: var(--slot-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .grid-slot.blocked {
+            background-color: var(--slot-blocked);
+            border-color: #111;
+            background-image: repeating-linear-gradient(45deg, var(--slot-blocked) 0, var(--slot-blocked) 10px, #161b22 10px, #161b22 20px);
+        }
+
+        .relic-item {
+            position: absolute;
+            background-color: rgba(22, 27, 34, 0.95);
+            border: 2px solid var(--text-muted);
+            box-sizing: border-box;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.75em;
+            text-align: center;
+            transition: all 0.2s;
+            overflow: hidden;
+            z-index: 10;
+            padding: 2px;
+            word-break: break-word;
+            border-radius: 4px;
+            color: var(--text-color);
+        }
+
+        .relic-item:hover {
+            border-color: var(--text-color);
+            z-index: 20;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+
+        .relic-item.selected {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.4);
+            z-index: 30;
+        }
+
+        /* Rarity Colors (Adjusted for Dark Mode) */
+        .rarity-0 { border-color: #8b949e; background: #21262d; } 
+        .rarity-1 { border-color: #58a6ff; background: #0d1117; } 
+        .rarity-2 { border-color: #d29922; background: #251e08; } 
+        .rarity-3 { border-color: #f85149; background: #280d0d; } 
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 10px;
+            box-sizing: border-box;
+            border-radius: 6px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px var(--accent-color);
+        }
+
+        /* Remove spinner arrows from number inputs */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+
+        button {
+            background-color: #238636; /* GitHub Green */
+            color: white;
+            border: 1px solid rgba(240,246,252,0.1);
+            padding: 6px 16px;
+            cursor: pointer;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+        button:hover { background-color: #2ea043; }
+        button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed; border-color: var(--border-color); }
+
+        /* Affix Styling */
+        .affix-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .affix-item {
+            background: var(--bg-color);
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            position: relative;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type=range] {
+            flex: 1;
+            accent-color: var(--accent-color);
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .calculated-value {
+            font-size: 0.9em;
+            color: #3fb950; /* Green */
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .range-info {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            float: right;
+            background: rgba(110, 118, 129, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        
+        .multiplier-tag {
+            background: rgba(56, 139, 253, 0.15);
+            color: #58a6ff;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            margin-left: 5px;
+            border: 1px solid rgba(56, 139, 253, 0.4);
+        }
+
+        .btn-download {
+            background-color: #238636;
+        }
+
+        .btn-add {
+            background-color: #1f6feb; /* GitHub Blue for primary actions */
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            font-size: 0.9em;
+        }
+        .btn-add:hover { background-color: #388bfd; }
+
+        .btn-remove {
+            background-color: transparent;
+            color: #f85149;
+            border: 1px solid rgba(248, 81, 73, 0.4);
+            padding: 4px 10px;
+            font-size: 0.8em;
+            border-radius: 6px;
+        }
+        .btn-remove:hover { 
+            background-color: rgba(248, 81, 73, 0.1);
+            border-color: #f85149;
+        }
+
+        .affix-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(2px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            display: none;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border-radius: 8px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-search {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            margin-bottom: 15px;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .affix-search-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            border-radius: 6px;
+        }
+
+        .search-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .search-item:last-child { border-bottom: none; }
+
+        .search-item:hover {
+            background: #21262d;
+        }
+
+        .search-item strong {
+            display: block;
+            color: var(--text-color);
+        }
+
+        .search-item small {
+            color: var(--text-muted);
+        }
+
+        .btn-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 0;
+        }
+        .btn-close:hover { color: var(--text-color); }
+        
+        .btn-select-affix {
+            background: var(--bg-color);
+            color: var(--text-color);
+            width: 100%;
+            text-align: left;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .btn-select-affix:hover {
+            border-color: var(--accent-color);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); border-left: 1px solid var(--border-color); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 5px; border: 2px solid var(--bg-color); }
+        ::-webkit-scrollbar-thumb:hover { background: #565e68; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h3>Relic Loadout Editor</h3>
+    <div style="flex:1"></div>
+    <button onclick="app.downloadSave()" class="btn-download" id="downloadBtn" disabled>Download PlayerSave0.json</button>
+</div>
+
+<div class="main-content">
+    <div class="sidebar">
+        <h4>Database Status</h4>
+        <div class="status-item">
+            <span>Relics DB</span> <span id="status-relics" class="status-pending">Loading...</span>
+        </div>
+        <div class="status-item">
+            <span>Affixes DB</span> <span id="status-affixes" class="status-pending">Loading...</span>
+        </div>
+        <div class="status-item">
+            <span>Config DB</span> <span id="status-config" class="status-pending">Loading...</span>
+        </div>
+        
+        <hr>
+
+        <h4>Save File</h4>
+        <div class="form-group">
+            <label>PlayerSave0.json</label>
+            <label class="file-upload-btn" id="lbl-save">
+                Select File
+                <input type="file" id="inp-save" onchange="app.loadSaveFile(this)" disabled>
+            </label>
+        </div>
+
+        <hr>
+        
+        <h4>Loadout Selection</h4>
+        <select id="loadoutSelect" onchange="app.switchLoadout()" disabled>
+            <option>Load save file first...</option>
+        </select>
+
+        <div style="margin-top: 20px;">
+            <label>Cell Size: <span id="cellSizeDisplay">80px</span></label>
+            <input type="range" min="65" max="95" value="80" 
+                   oninput="app.updateGridSettings(this.value)">
+        </div>
+    </div>
+
+    <div class="editor-area">
+        <div id="gridContainer" class="inventory-grid"></div>
+    </div>
+
+    <div class="properties-panel">
+        <h4>Inspector</h4>
+        <div id="inspectorContent">
+            <p style="color: #666; font-style: italic;">Select a relic to edit details.</p>
+        </div>
+    </div>
+</div>
+
+<div id="affixModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Select Affix</h3>
+            <button class="btn-close" onclick="app.closeModal()">&times;</button>
+        </div>
+        <input type="text" id="affixSearchInput" class="modal-search" placeholder="Search affixes..." onkeyup="app.filterAffixes()">
+        <div id="affixSearchResults" class="affix-search-list">
+            </div>
+    </div>
+</div>
+
+<script>
+class RelicEditor {
+    constructor() {
+        this.data = {
+            save: null,
+            relics: null,
+            affixes: null,
+            config: null
+        };
+        
+        this.definitions = {
+            relics: {}, 
+            affixes: {},
+            // Loaded from file (Global Default)
+            defaultUpgradeModifiers: null, 
+            // Hardcoded Fallback (Standard Curve)
+            fallbackUpgradeModifiers: {
+                "0": 1.0, "1": 1.2, "2": 1.4, "3": 1.6, "4": 1.8,
+                "5": 2.0, "6": 2.2, "7": 2.4, "8": 2.6, "9": 2.8, "10": 3.0
+            },
+            sizes: {
+                "Small":   {w: 1, h: 1},
+                "Large":   {w: 1, h: 2}, 
+                "Grand":   {w: 1, h: 4},
+                "Exalted": {w: 2, h: 2},
+                "Default": {w: 1, h: 1}
+            }
+        };
+
+        this.currentLoadoutIndex = 0;
+        this.selectedRelicIndex = -1;
+        
+        this.initAutoLoad();
+    }
+
+    async initAutoLoad() {
+        const files = [
+            { key: 'relics', path: 'relic_data/Relics.json' },
+            { key: 'affixes', path: 'relic_data/Relic Affixes.json' },
+            { key: 'config', path: 'relic_data/Relic Inventory Config.json' }
+        ];
+
+        try {
+            const promises = files.map(file => 
+                fetch(file.path)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.data[file.key] = data;
+                        this.updateStatus(file.key, 'Loaded', 'ok');
+                    })
+                    .catch(err => {
+                        console.error(`Failed to load ${file.path}:`, err);
+                        this.updateStatus(file.key, 'Error', 'error');
+                        throw err;
+                    })
+            );
+
+            await Promise.all(promises);
+            this.processDefinitions();
+            this.enableSaveUpload();
+            
+        } catch (error) {
+            alert("Error loading data files. Please check the 'relic_data' folder exists.");
+        }
+
+        const cellSizeSlider = document.querySelector('input[type="range"][min="65"]');
+        if (cellSizeSlider) {
+            cellSizeSlider.value = 80; // Ensure visual handle is at 80
+            this.updateGridSettings(80); // Ensure grid renders at 80
+        }
+    }
+
+    updateStatus(key, text, type) {
+        const el = document.getElementById(`status-${key}`);
+        if(el) {
+            el.textContent = text;
+            el.className = `status-${type}`;
+        }
+    }
+
+    enableSaveUpload() {
+        const input = document.getElementById('inp-save');
+        const lbl = document.getElementById('lbl-save');
+        if(input && lbl) {
+            input.disabled = false;
+            lbl.classList.remove('disabled');
+        }
+    }
+
+    processDefinitions() {
+        if (this.data.relics && this.data.relics.Relics) {
+            this.data.relics.Relics.forEach(r => this.definitions.relics[r.id] = r);
+        }
+        
+        if (this.data.affixes && this.data.affixes["Relic Affixes"]) {
+            this.data.affixes["Relic Affixes"].forEach(a => this.definitions.affixes[a.id] = a);
+        }
+
+        // Capture Global Default Config
+        if (this.data.affixes && this.data.affixes.relicUpgradeModifierConfig) {
+            this.definitions.defaultUpgradeModifiers = this.data.affixes.relicUpgradeModifierConfig.upgradeModifier;
+        }
+    }
+
+    loadSaveFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                this.data.save = JSON.parse(e.target.result);
+                this.initEditorUI();
+            } catch (err) {
+                alert(`Error parsing save file: ${err.message}`);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    initEditorUI() {
+        const saveData = this.data.save._relicLoadoutsSaveData;
+        const select = document.getElementById('loadoutSelect');
+        select.innerHTML = '';
+        select.disabled = false;
+
+        if (saveData && saveData._loadouts) {
+            saveData._loadouts.forEach((l, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = `Loadout ${index + 1} (${l.Items.length} items)`;
+                select.appendChild(opt);
+            });
+            select.value = saveData._currentIndex !== undefined ? saveData._currentIndex : 0;
+            this.currentLoadoutIndex = parseInt(select.value);
+        }
+
+        document.getElementById('downloadBtn').disabled = false;
+        this.renderGrid();
+    }
+
+    switchLoadout() {
+        const select = document.getElementById('loadoutSelect');
+        this.currentLoadoutIndex = parseInt(select.value);
+        this.selectedRelicIndex = -1;
+        this.renderGrid();
+        this.renderInspector();
+    }
+
+    updateGridSettings(size) {
+        // 1. Update CSS Variable for visual grid
+        document.documentElement.style.setProperty('--grid-cell-size', size + 'px');
+        
+        // 2. Update the Text Display
+        const display = document.getElementById('cellSizeDisplay');
+        if (display) display.textContent = size + 'px';
+
+        // 3. Force re-calculation of relic positions
+        this.renderGrid();
+    }
+
+    getRelicSize(relicDef) {
+        if (!relicDef) return this.definitions.sizes.Default;
+        return this.definitions.sizes[relicDef.eRelicSize] || this.definitions.sizes.Default;
+    }
+
+    renderGrid() {
+        const container = document.getElementById('gridContainer');
+        container.innerHTML = '';
+
+        if (!this.data.config) return;
+
+        const shapeConfig = this.data.config.playerInventoryShapeTiers;
+        const currentShape = shapeConfig[shapeConfig.length - 1]; 
+        
+        const width = currentShape.width;
+        const height = currentShape.height;
+
+        container.style.gridTemplateColumns = `repeat(${width}, var(--grid-cell-size))`;
+        container.style.gridTemplateRows = `repeat(${height}, var(--grid-cell-size))`;
+
+        currentShape.shape.forEach(isValid => {
+            const div = document.createElement('div');
+            div.className = `grid-slot ${isValid ? '' : 'blocked'}`;
+            container.appendChild(div);
+        });
+
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        
+        loadout.Items.forEach((item, index) => {
+            const def = this.definitions.relics[item._relicBaseDefinitionID];
+            const size = this.getRelicSize(def);
+            
+            const el = document.createElement('div');
+            el.className = `relic-item rarity-${item._eRelicRarity}`;
+            if (index === this.selectedRelicIndex) el.classList.add('selected');
+
+            const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
+            const gap = 4;
+
+            const visualY = height - item._position.y - size.h;
+            
+            el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
+            el.style.top = `${visualY * (cellSize + gap) + 10}px`;
+            el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
+            el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
+
+            el.innerHTML = `<strong>${def ? this.extractName(def) : 'Unknown'}</strong>`;
+            
+            el.onclick = (e) => {
+                e.stopPropagation();
+                this.selectedRelicIndex = index;
+                this.renderGrid();
+                this.renderInspector();
+            };
+
+            container.appendChild(el);
+        });
+    }
+
+    extractName(def) {
+        if (Array.isArray(def.nameLocalizationKey)) {
+            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
+            return en ? en.langTranslation : def.nameLocalizationKey[0].langTranslation;
+        }
+        return def.name;
+    }
+
+    formatString(str) {
+        if (!str) return '';
+        return str.replace(/([A-Z])/g, ' $1') // 1. Add space before capitals
+                  .replace(/\s+/g, ' ')       // 2. Collapse multiple spaces into one
+                  .trim();                    // 3. Remove leading/trailing spaces
+    }
+
+    getAffixName(affixId) {
+        const def = this.definitions.affixes[affixId];
+        if (!def) return `ID: ${affixId}`;
+        
+        // Priority 1: name (formatted)
+        if (def.name) {
+            return this.formatString(def.name);
+        }
+
+        // Priority 2: eStatDefinition (formatted)
+        if (def.eStatDefinition) {
+            return this.formatString(def.eStatDefinition);
+        }
+
+        // Priority 3: fallback to localization
+        if (Array.isArray(def.nameLocalizationKey)) {
+            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
+            return en ? en.langTranslation : def.nameLocalizationKey[0].langTranslation;
+        }
+        
+        return `ID: ${affixId}`;
+    }
+
+    getAffixRange(affixId, tier) {
+        const def = this.definitions.affixes[affixId];
+        if (!def || !def.tierRollRanges) return null;
+        
+        const tierData = def.tierRollRanges.find(t => t.tier === tier);
+        return tierData ? tierData.rollRange : null; 
+    }
+
+    getUpgradeMultiplier(level, affixDef) {
+        let mods = null;
+
+        // 1. Check for Affix-Specific Config (The "Multiplicative" override)
+        if (affixDef && affixDef.relicUpgradeModifierConfig && affixDef.relicUpgradeModifierConfig.upgradeModifier) {
+            mods = affixDef.relicUpgradeModifierConfig.upgradeModifier;
+        }
+        // 2. Check for Global Default (Loaded from file)
+        else if (this.definitions.defaultUpgradeModifiers) {
+            mods = this.definitions.defaultUpgradeModifiers;
+        }
+        // 3. Fallback to Hardcoded Standard
+        else {
+            mods = this.definitions.fallbackUpgradeModifiers;
+        }
+
+        if (mods) {
+            const val = mods[String(level)];
+            return val !== undefined ? parseFloat(val) : 1.0;
+        }
+        return 1.0;
+    }
+
+    getAdditiveOverrideConfig(affixDef) {
+        if (!affixDef) return null;
+        // Check 1: Root property
+        if (affixDef.upgradeModifierOverride) return affixDef.upgradeModifierOverride;
+        // Check 2: Nested inside modifier config
+        if (affixDef.relicUpgradeModifierConfig && affixDef.relicUpgradeModifierConfig.upgradeModifierOverride) {
+            return affixDef.relicUpgradeModifierConfig.upgradeModifierOverride;
+        }
+        return null;
+    }
+
+    addAffix(isImplicit) {
+        if (this.currentLoadoutIndex === -1 || this.selectedRelicIndex === -1) return;
+        
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const item = loadout.Items[this.selectedRelicIndex];
+        
+        // Default new affix template
+        // We use ID 0 as a placeholder (user can change it via dropdown)
+        const newAffix = {
+            _relicAffixDefinitionId: 0, 
+            _rollValue: 0.5,
+            _locked: false,
+            _tier: item._tier || 1
+        };
+
+        if (isImplicit) {
+            if (!item._implicitAffixesData) item._implicitAffixesData = [];
+            // Implicit affixes are wrapped in a container object
+            item._implicitAffixesData.push({ _relicAffixData: newAffix });
+        } else {
+            if (!item._affixesData) item._affixesData = [];
+            item._affixesData.push(newAffix);
+        }
+        
+        this.renderInspector();
+    }
+
+    removeAffix(index, isImplicit) {
+        
+        if (this.currentLoadoutIndex === -1 || this.selectedRelicIndex === -1) return;
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const item = loadout.Items[this.selectedRelicIndex];
+
+        if (isImplicit && item._implicitAffixesData) {
+            item._implicitAffixesData.splice(index, 1);
+        } else if (!isImplicit && item._affixesData) {
+            item._affixesData.splice(index, 1);
+        }
+        this.renderInspector();
+    }
+
+    calculateRealValue(roll, range, level, affixDef) {
+        if (!range) return null;
+        const [min, max] = range;
+        const baseVal = min + roll * (max - min);
+
+        const isIntegerRange = Number.isInteger(min) && Number.isInteger(max) && min == max;
+        if (isIntegerRange) {
+            return `+${baseVal.toFixed(2)}`;
+        }
+        
+        // 1. Check for explicit 'upgradeModifierOverride' (Flat Addition)
+        // This handles cases like "Stat - Implicit - Mana %" which adds flat values (0.02, 0.04, etc.)
+        if (affixDef && affixDef.upgradeModifierOverride) {
+            const override = parseFloat(affixDef.upgradeModifierOverride[level] || 0);
+            const finalVal = baseVal + override;
+
+            // Formatting for 1.x stats (e.g. 1.1 -> +10%)
+            if (max <= 2.0 && min > 1.0) {
+                 return `+${((finalVal - 1.0) * 100).toFixed(2)}%`;
+            }
+            return `+${finalVal.toFixed(2)}`;
+        }
+        // 2. Standard Multiplier Logic (Your requested calculation)
+        const multiplier = this.getUpgradeMultiplier(level, affixDef);
+        let finalVal;
+
+        // Logic for 1.x Percentage Stats (e.g. 1.45 -> +45%)
+        // Scales the ENTIRE base value, then subtracts 1 to get the percentage gain.
+        if (max <= 2.0 && min > 1.0) {
+            finalVal = (baseVal * multiplier) - 1.0;
+        } else {
+            // Standard Calculation (e.g. 10 Health -> 20 Health)
+            finalVal = baseVal * multiplier;
+        }
+        // Formatting
+        if (max <= 2.0) {
+            return `+${(finalVal * 100).toFixed(2)}%`;
+        }
+        return `+${finalVal.toFixed(2)}`;
+    }
+
+    renderInspector() {
+        const container = document.getElementById('inspectorContent');
+        container.innerHTML = '';
+
+        if (this.selectedRelicIndex === -1) {
+            container.innerHTML = '<p style="color: #666; font-style: italic;">Select a relic to edit details.</p>';
+            return;
+        }
+
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const item = loadout.Items[this.selectedRelicIndex];
+        const def = this.definitions.relics[item._relicBaseDefinitionID];
+
+        // Header
+        const header = document.createElement('div');
+        header.innerHTML = `<h3>${def ? this.extractName(def) : 'Unknown Relic'}</h3>`;
+        container.appendChild(header);
+
+        // Core Stats
+        container.appendChild(this.createInput('Level (0-5)', 'number', item._upgradeLevel, (v) => {
+            item._upgradeLevel = Math.min(5, Math.max(0, parseInt(v))); 
+            this.renderInspector(); 
+        }));
+        
+        container.appendChild(this.createInput('Tier (1-4)', 'number', item._tier, (v) => {
+            item._tier = Math.min(4, Math.max(1, parseInt(v)));
+            this.renderInspector(); 
+        }));
+        
+        container.appendChild(this.createInput('Rarity (0-3)', 'number', item._eRelicRarity, (v) => {
+            item._eRelicRarity = Math.min(3, Math.max(0, parseInt(v)));
+            this.renderGrid();
+        }));
+        
+        // UPDATED: Check for existing high rolls (> 1.0)
+        // If found, force the checkbox to be checked so the sliders behave correctly immediately.
+        const hasHighRolls = (item._affixesData && item._affixesData.some(a => a._rollValue > 1.0)) || 
+                             (item._implicitAffixesData && item._implicitAffixesData.some(i => i._relicAffixData._rollValue > 1.0));
+        
+        // If we detected high rolls, we implicitly consider it Ascended for the UI state
+        // We also ensure the data model matches if it wasn't set yet
+        if (hasHighRolls && !item._ascended) {
+            item._ascended = true; 
+        }
+
+        const ascendedDiv = document.createElement('div');
+        ascendedDiv.className = 'form-group';
+        ascendedDiv.innerHTML = `
+            <label style="display:inline-flex; align-items:center; gap:8px; color:#fff;">
+                <input type="checkbox" ${item._ascended ? 'checked' : ''} 
+                onchange="app.updateItemAscension(this.checked)"> Divined
+            </label>
+        `;
+        container.appendChild(ascendedDiv);
+        
+        // Position Inputs
+        const posGroup = document.createElement('div');
+        posGroup.className = 'form-group';
+        posGroup.innerHTML = '<label>Position (X, Y)</label>';
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '10px';
+        
+        const xIn = document.createElement('input'); xIn.type = 'number'; xIn.value = item._position.x;
+        xIn.onchange = (e) => { item._position.x = parseInt(e.target.value); this.renderGrid(); };
+        
+        const yIn = document.createElement('input'); yIn.type = 'number'; yIn.value = item._position.y;
+        yIn.onchange = (e) => { item._position.y = parseInt(e.target.value); this.renderGrid(); };
+
+        row.appendChild(xIn);
+        row.appendChild(yIn);
+        posGroup.appendChild(row);
+        container.appendChild(posGroup);
+
+        const currentTier = item._tier;
+        const currentLevel = item._upgradeLevel;
+
+        // Ensure arrays exist so we can add to them
+        if (!item._affixesData) item._affixesData = [];
+        if (!item._implicitAffixesData) item._implicitAffixesData = [];
+
+        // Render Lists (Always called to show Add buttons)
+        this.renderAffixList(container, item._affixesData, "Affixes", currentTier, currentLevel);
+        this.renderImplicitAffixList(container, item._implicitAffixesData, "Implicit Affixes", currentTier, currentLevel);
+    }
+
+    // --- MODAL LOGIC START ---
+    
+    openAffixModal(currentId, callback) {
+        this.pendingAffixCallback = callback;
+        
+        const modal = document.getElementById('affixModal');
+        const list = document.getElementById('affixSearchResults');
+        const input = document.getElementById('affixSearchInput');
+        
+        modal.style.display = 'flex';
+        input.value = '';
+        input.focus();
+        
+        // Pre-generate list
+        this.allAffixOptions = Object.values(this.definitions.affixes).map(def => ({
+            id: def.id,
+            name: this.getAffixName(def.id),
+            rawDef: def
+        })).sort((a, b) => a.name.localeCompare(b.name));
+
+        this.renderAffixSearchList(this.allAffixOptions);
+    }
+
+    closeModal() {
+        document.getElementById('affixModal').style.display = 'none';
+        this.pendingAffixCallback = null;
+    }
+
+    getLevenshteinDistance(a, b) {
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+
+        const matrix = [];
+
+        // Increment along the first column of each row
+        for (let i = 0; i <= b.length; i++) {
+            matrix[i] = [i];
+        }
+
+        // Increment each column in the first row
+        for (let j = 0; j <= a.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        // Fill in the rest of the matrix
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // substitution
+                        Math.min(
+                            matrix[i][j - 1] + 1, // insertion
+                            matrix[i - 1][j] + 1  // deletion
+                        )
+                    );
+                }
+            }
+        }
+
+        return matrix[b.length][a.length];
+    }
+
+    filterAffixes() {
+        const rawQuery = document.getElementById('affixSearchInput').value.toLowerCase().trim();
+        
+        if (!rawQuery) {
+            this.renderAffixSearchList(this.allAffixOptions);
+            return;
+        }
+
+        // 1. Split user input into individual words (tokens)
+        // e.g., "All skils" -> ["all", "skils"]
+        const queryTokens = rawQuery.split(/[\s-]+/).filter(t => t.length > 0);
+
+        const filtered = this.allAffixOptions.filter(opt => {
+            const name = opt.name.toLowerCase();
+            const id = String(opt.id);
+
+            // Optimization: If the full phrase is an exact match, keep it immediately
+            if (name.includes(rawQuery) || id.includes(rawQuery)) {
+                opt._matchType = 'exact';
+                return true;
+            }
+
+            // 2. Token Matching Strategy
+            // We split the affix name into words: "All Skills - Damage" -> ["all", "skills", "damage"]
+            const nameTokens = name.split(/[\s-]+/);
+
+            // We check: Does EVERY word in the user's query find a match in the affix name?
+            const allTokensMatched = queryTokens.every(qToken => {
+                
+                // A. Check for partial substring match (e.g., "Dam" matches "Damage")
+                if (nameTokens.some(nT => nT.includes(qToken))) return true;
+
+                // B. Check for fuzzy/typo match (e.g., "skils" matches "Skills")
+                // Only run this on words of 3+ letters to avoid noise
+                if (qToken.length >= 3) {
+                    const maxEdits = qToken.length > 5 ? 2 : 1;
+                    return nameTokens.some(nT => {
+                        // Optimization: Skip if lengths are too different
+                        if (Math.abs(nT.length - qToken.length) > maxEdits) return false;
+                        return this.getLevenshteinDistance(qToken, nT) <= maxEdits;
+                    });
+                }
+                
+                return false;
+            });
+
+            if (allTokensMatched) {
+                opt._matchType = 'fuzzy';
+                return true;
+            }
+
+            return false;
+        });
+
+        // 3. Sort Results: Prioritize exact matches
+        filtered.sort((a, b) => {
+            if (a._matchType === 'exact' && b._matchType !== 'exact') return -1;
+            if (a._matchType !== 'exact' && b._matchType === 'exact') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        this.renderAffixSearchList(filtered);
+    }
+
+    renderAffixSearchList(items) {
+        const container = document.getElementById('affixSearchResults');
+        container.innerHTML = '';
+        
+        if (items.length === 0) {
+            container.innerHTML = '<div style="padding:10px; color:#666;">No affixes found.</div>';
+            return;
+        }
+
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'search-item';
+            div.innerHTML = `
+                <strong>${item.name}</strong>
+                <small>ID: ${item.id}</small>
+            `;
+            div.onclick = () => {
+                if (this.pendingAffixCallback) {
+                    this.pendingAffixCallback(item.id);
+                }
+                this.closeModal();
+            };
+            container.appendChild(div);
+        });
+    }
+
+    // --- MODAL LOGIC END ---
+
+    createAffixSelect(label, selectedId, onChange) {
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        
+        const btn = document.createElement('button');
+        btn.className = 'btn-select-affix';
+        
+        // Show current name on the button
+        const currentName = this.definitions.affixes[selectedId] 
+            ? this.getAffixName(selectedId) 
+            : `Unknown ID: ${selectedId}`;
+            
+        btn.innerHTML = `${currentName} <span style="float:right; color:#888;">&#9660;</span>`;
+        
+        btn.onclick = () => {
+            this.openAffixModal(selectedId, (newId) => {
+                onChange(newId);
+            });
+        };
+        
+        div.appendChild(lbl);
+        div.appendChild(btn);
+        return div;
+    }
+
+    renderAffixList(container, affixes, title, tier, level) {
+        if (!affixes) return;
+        
+        container.appendChild(document.createElement('hr'));
+        container.appendChild(Object.assign(document.createElement('h4'), {textContent: title}));
+
+        const list = document.createElement('div');
+        list.className = 'affix-list';
+
+        affixes.forEach((affix, idx) => {
+            const div = document.createElement('div');
+            div.className = 'affix-item';
+            
+            // Lookup Definition
+            const def = this.definitions.affixes[affix._relicAffixDefinitionId];
+            
+            // Name Label
+            const nameLabel = document.createElement('label');
+            nameLabel.style.color = '#fff';
+            nameLabel.innerHTML = this.getAffixName(affix._relicAffixDefinitionId);
+            
+            // Multiplier Tag
+            const override = this.getAdditiveOverrideConfig(def);
+            if (!override) {
+                const mult = this.getUpgradeMultiplier(level, def);
+                if(mult > 1.0) {
+                     nameLabel.innerHTML += ` <span class="multiplier-tag">x${mult}</span>`;
+                }
+            }
+            div.appendChild(nameLabel);
+
+            // Range & Value
+            const range = this.getAffixRange(affix._relicAffixDefinitionId, tier);
+            if (range) {
+                const realVal = document.createElement('span');
+                realVal.className = 'calculated-value';
+                realVal.textContent = this.calculateRealValue(affix._rollValue, range, level, def);
+                div.appendChild(realVal);
+
+                const rangeInfo = document.createElement('span');
+                rangeInfo.className = 'range-info';
+                rangeInfo.textContent = `T${tier} Range: [${range[0]} - ${range[1]}]`;
+                div.insertBefore(rangeInfo, nameLabel);
+            }
+
+            // Dropdown
+            div.appendChild(this.createAffixSelect('Affix Name', affix._relicAffixDefinitionId, (v) => {
+                affix._relicAffixDefinitionId = parseInt(v);
+                this.renderInspector();
+            }));
+
+            // Slider
+            const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+            const item = loadout.Items[this.selectedRelicIndex];
+            const isDivine = item._ascended;
+            const maxVal = Math.max(1.0, affix._rollValue, isDivine ? 1.2 : 1.0);
+            
+            const sliderGroup = document.createElement('div');
+            sliderGroup.className = 'form-group';
+            sliderGroup.innerHTML = `<label>Roll Coefficient (0.0 - ${maxVal.toFixed(1)})</label>`;
+            
+            const sliderContainer = document.createElement('div');
+            sliderContainer.className = 'slider-container';
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = 0;
+            slider.max = maxVal;
+            slider.step = 0.001;
+            slider.value = affix._rollValue;
+
+            const numInput = document.createElement('input');
+            numInput.type = 'number';
+            numInput.step = 0.001;
+            numInput.value = affix._rollValue.toFixed(3);
+            numInput.style.width = '80px';
+
+            slider.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                affix._rollValue = val;
+                numInput.value = val;
+                if (range) {
+                    div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
+                }
+            };
+            numInput.onchange = (e) => {
+                let val = parseFloat(e.target.value);
+                if (val > maxVal && !isDivine) val = maxVal; 
+                affix._rollValue = val;
+                slider.value = val;
+                this.renderInspector(); 
+            };
+
+            sliderContainer.appendChild(slider);
+            sliderContainer.appendChild(numInput);
+            sliderGroup.appendChild(sliderContainer);
+            div.appendChild(sliderGroup);
+
+            // Locked Checkbox
+            const lockCheck = document.createElement('div');
+            lockCheck.innerHTML = `
+                <label style="display:inline-flex; align-items:center; gap:5px;">
+                    <input type="checkbox" ${affix._locked ? 'checked' : ''} 
+                    onchange="app.updateAffixLock(${idx}, this.checked, false)"> Locked
+                </label>
+            `;
+            div.appendChild(lockCheck);
+
+            // FOOTER: Remove Button (Moved Here)
+            const footer = document.createElement('div');
+            footer.className = 'affix-footer';
+            
+            const btnRemove = document.createElement('button');
+            btnRemove.className = 'btn-remove';
+            btnRemove.textContent = 'Remove';
+            btnRemove.onclick = () => this.removeAffix(idx, false);
+            
+            footer.appendChild(btnRemove);
+            div.appendChild(footer);
+
+            list.appendChild(div);
+        });
+
+        // Add Button (Outside Loop)
+        const btnAdd = document.createElement('button');
+        btnAdd.className = 'btn-add';
+        btnAdd.textContent = '+ Add Affix';
+        btnAdd.onclick = () => this.addAffix(false);
+        list.appendChild(btnAdd);
+
+        container.appendChild(list);
+    }
+
+    renderImplicitAffixList(container, implicitData, title, tier, level) {
+        if (!implicitData || implicitData.length === 0) return;
+
+        container.appendChild(document.createElement('hr'));
+        container.appendChild(Object.assign(document.createElement('h4'), {textContent: title}));
+        
+        const list = document.createElement('div');
+        list.className = 'affix-list';
+
+        implicitData.forEach((impObj, idx) => {
+            const affix = impObj._relicAffixData;
+            const div = document.createElement('div');
+            div.className = 'affix-item';
+            div.style.borderColor = '#007acc';
+
+            const defId = affix._relicAffixDefinitionId;
+            const def = this.definitions.affixes[defId];
+
+            const nameLabel = document.createElement('label');
+            nameLabel.style.color = '#add8e6';
+            nameLabel.innerHTML = this.getAffixName(defId);
+            
+            const override = this.getAdditiveOverrideConfig(def);
+            if (!override) {
+                const mult = this.getUpgradeMultiplier(level, def);
+                if(mult > 1.0) {
+                     nameLabel.innerHTML += ` <span class="multiplier-tag">x${mult}</span>`;
+                }
+            }
+            div.appendChild(nameLabel);
+
+            const range = this.getAffixRange(defId, tier);
+            if (range) {
+                const realVal = document.createElement('span');
+                realVal.className = 'calculated-value';
+                realVal.textContent = this.calculateRealValue(affix._rollValue, range, level, def);
+                div.appendChild(realVal);
+
+                const rangeInfo = document.createElement('span');
+                rangeInfo.className = 'range-info';
+                rangeInfo.textContent = `T${tier} Range: [${range[0]} - ${range[1]}]`;
+                div.insertBefore(rangeInfo, nameLabel);
+            }
+
+            div.appendChild(this.createAffixSelect('Affix Name', defId, (v) => {
+                affix._relicAffixDefinitionId = parseInt(v);
+                this.renderInspector();
+            }));
+
+            const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+            const item = loadout.Items[this.selectedRelicIndex];
+            const isDivine = item._ascended;
+            const maxVal = Math.max(1.0, affix._rollValue, isDivine ? 1.2 : 1.0);
+
+            const sliderGroup = document.createElement('div');
+            sliderGroup.className = 'form-group';
+            sliderGroup.innerHTML = `<label>Roll Coefficient</label>`;
+            const sliderContainer = document.createElement('div');
+            sliderContainer.className = 'slider-container';
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = 0;
+            slider.max = maxVal;
+            slider.step = 0.001;
+            slider.value = affix._rollValue;
+
+            const numInput = document.createElement('input');
+            numInput.type = 'number';
+            numInput.step = 0.001;
+            numInput.value = affix._rollValue.toFixed(3);
+            numInput.style.width = '80px';
+
+            slider.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                affix._rollValue = val;
+                numInput.value = val;
+                if(range) {
+                    div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
+                }
+            };
+            numInput.onchange = (e) => {
+                affix._rollValue = parseFloat(e.target.value);
+                slider.value = affix._rollValue;
+                this.renderInspector();
+            };
+
+            sliderContainer.appendChild(slider);
+            sliderContainer.appendChild(numInput);
+            sliderGroup.appendChild(sliderContainer);
+            div.appendChild(sliderGroup);
+
+            // FOOTER: Remove Button (Moved Here)
+            const footer = document.createElement('div');
+            footer.className = 'affix-footer';
+
+            const btnRemove = document.createElement('button');
+            btnRemove.className = 'btn-remove';
+            btnRemove.textContent = 'Remove';
+            btnRemove.onclick = () => this.removeAffix(idx, true);
+            
+            footer.appendChild(btnRemove);
+            div.appendChild(footer);
+
+            list.appendChild(div);
+        });
+
+        // Add Implicit Button
+        const btnAdd = document.createElement('button');
+        btnAdd.className = 'btn-add';
+        btnAdd.textContent = '+ Add Implicit';
+        btnAdd.onclick = () => this.addAffix(true);
+        list.appendChild(btnAdd);
+
+        container.appendChild(list);
+    }
+
+    createInput(label, type, value, onChange, step=1) {
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        
+        const input = document.createElement('input');
+        input.type = type;
+        input.value = value;
+        if(type === 'number') input.step = step;
+        
+        input.onchange = (e) => onChange(e.target.value);
+        
+        div.appendChild(lbl);
+        div.appendChild(input);
+        return div;
+    }
+
+    updateItemAscension(isAscended) {
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const item = loadout.Items[this.selectedRelicIndex];
+        if (item) {
+            item._ascended = isAscended;
+            this.renderInspector();
+        }
+    }
+
+    updateAffixLock(affixIndex, isLocked, isImplicit) {
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const item = loadout.Items[this.selectedRelicIndex];
+        if (item) {
+            if(!isImplicit && item._affixesData[affixIndex]) {
+                item._affixesData[affixIndex]._locked = isLocked;
+            }
+        }
+    }
+
+    downloadSave() {
+        if (!this.data.save) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data.save, null, 4));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = "PlayerSave0.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+}
+
+const app = new RelicEditor();
+</script>
+</body>
+</html>
