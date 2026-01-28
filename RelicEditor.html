@@ -566,7 +566,8 @@ class RelicEditor {
         const files = [
             { key: 'relics', path: 'json_data/relic_data/Relics.json' },
             { key: 'affixes', path: 'json_data/relic_data/Relic Affixes.json' },
-            { key: 'config', path: 'json_data/relic_data/Relic Inventory Config.json' }
+            { key: 'config', path: 'json_data/relic_data/Relic Inventory Config.json' },
+            { key: 'implicit_mapping', path: 'json_data/relic_data/implicit_mapping.json' }
         ];
 
         try {
@@ -873,43 +874,67 @@ class RelicEditor {
 
     calculateRealValue(roll, range, level, affixDef) {
         if (!range) return null;
+
         const [min, max] = range;
         const baseVal = min + roll * (max - min);
+        const corrupted = min === max;
 
-        const isIntegerRange = Number.isInteger(min) && Number.isInteger(max) && min == max;
-        if (isIntegerRange) {
-            return `+${baseVal.toFixed(2)}`;
-        }
-        
-        // 1. Check for explicit 'upgradeModifierOverride' (Flat Addition)
-        // This handles cases like "Stat - Implicit - Mana %" which adds flat values (0.02, 0.04, etc.)
-        if (affixDef && affixDef.upgradeModifierOverride) {
-            const override = parseFloat(affixDef.upgradeModifierOverride[level] || 0);
-            const finalVal = baseVal + override;
+        const override =
+            affixDef?.upgradeModifierOverride
+                ? parseFloat(affixDef.upgradeModifierOverride[level] || 0)
+                : null;
 
-            // Formatting for 1.x stats (e.g. 1.1 -> +10%)
-            if (max <= 2.0 && min > 1.0) {
-                 return `+${((finalVal - 1.0) * 100).toFixed(2)}%`;
-            }
-            return `+${finalVal.toFixed(2)}`;
-        }
-        // 2. Standard Multiplier Logic (Your requested calculation)
-        const multiplier = this.getUpgradeMultiplier(level, affixDef);
+        const multiplier =
+            override !== null
+                ? override
+                : this.getUpgradeMultiplier(level, affixDef);
+
+        const config = affixDef?.relicUpgradeModifierConfig || {};
+        const modType = config.modifierType || affixDef?.modifierType || "Additive";
+
         let finalVal;
 
-        // Logic for 1.x Percentage Stats (e.g. 1.45 -> +45%)
-        // Scales the ENTIRE base value, then subtracts 1 to get the percentage gain.
-        if (max <= 2.0 && min > 1.0) {
-            finalVal = (baseVal * multiplier) - 1.0;
+        if (corrupted) {
+            if (Number.isInteger(min) && Number.isInteger(max)) {
+                return `+${baseVal.toFixed(2)}`;
+            }
+
+            if (modType === "Multiplicative") {
+                finalVal = baseVal * (multiplier || 1);
+                return `+${(finalVal * 100).toFixed(2)}%`;
+            }
+
+            finalVal = baseVal + (multiplier || 0);
+
+            if (finalVal >= 1.0 && finalVal <= 2.0 && max <= 2.0) {
+                return `+${((finalVal - 1.0) * 100).toFixed(2)}%`;
+            }
+
+            return `+${finalVal.toFixed(2)}`;
+        }
+
+        // Non-corrupted
+        if (override !== null) {
+            finalVal = baseVal + override;
         } else {
-            // Standard Calculation (e.g. 10 Health -> 20 Health)
             finalVal = baseVal * multiplier;
         }
-        // Formatting
+
+        // Normalize 1.x stats
+        if (max <= 2.0 && min > 1.0) {
+            finalVal -= 1.0;
+        }
+
         if (max <= 2.0) {
             return `+${(finalVal * 100).toFixed(2)}%`;
         }
+
         return `+${finalVal.toFixed(2)}`;
+    }
+
+    toggleLimitUnlock(isChecked) {
+        this.ui_unlockLimits = isChecked;
+        this.renderInspector();
     }
 
     renderInspector() {
@@ -936,8 +961,16 @@ class RelicEditor {
             this.renderInspector(); 
         }));
         
-        container.appendChild(this.createInput('Tier (1-4)', 'number', item._tier, (v) => {
-            item._tier = Math.min(4, Math.max(1, parseInt(v)));
+        // Tier (1-based direct mapping)
+        const currentTier = item._tier || 1; 
+        container.appendChild(this.createInput('Tier (1-4)', 'number', currentTier, (v) => {
+            const val = Math.min(4, Math.max(1, parseInt(v)));
+            item._tier = val; 
+            // Sync affixes to match item tier
+            if (item._affixesData) item._affixesData.forEach(a => a._tier = val);
+            if (item._implicitAffixesData) item._implicitAffixesData.forEach(i => {
+                if (i._relicAffixData) i._relicAffixData._tier = val;
+            });
             this.renderInspector(); 
         }));
         
@@ -946,27 +979,29 @@ class RelicEditor {
             this.renderGrid();
         }));
         
-        // UPDATED: Check for existing high rolls (> 1.0)
-        // If found, force the checkbox to be checked so the sliders behave correctly immediately.
+        // --- FIX START: Decouple "High Rolls" from "Ascended Flag" ---
+        
+        // 1. Detect if we need to show extended sliders (Divined/High Rolls)
         const hasHighRolls = (item._affixesData && item._affixesData.some(a => a._rollValue > 1.0)) || 
                              (item._implicitAffixesData && item._implicitAffixesData.some(i => i._relicAffixData._rollValue > 1.0));
         
-        // If we detected high rolls, we implicitly consider it Ascended for the UI state
-        // We also ensure the data model matches if it wasn't set yet
-        if (hasHighRolls && !item._ascended) {
-            item._ascended = true; 
-        }
+        // 2. Determine UI State (Unlocked if high rolls exist OR if user toggles checkbox)
+        // We use a temporary class property 'ui_unlockLimits' so it persists during the session but isn't saved to JSON
+        const isUnlocked = (this.ui_unlockLimits !== undefined) ? this.ui_unlockLimits : hasHighRolls;
 
-        const ascendedDiv = document.createElement('div');
-        ascendedDiv.className = 'form-group';
-        ascendedDiv.innerHTML = `
+        // 3. Render "Unlock Limits" Checkbox (Purely UI)
+        const unlockDiv = document.createElement('div');
+        unlockDiv.className = 'form-group';
+        unlockDiv.innerHTML = `
             <label style="display:inline-flex; align-items:center; gap:8px; color:#fff;">
-                <input type="checkbox" ${item._ascended ? 'checked' : ''} 
-                onchange="app.updateItemAscension(this.checked)"> Divined
+                <input type="checkbox" ${isUnlocked ? 'checked' : ''} 
+                onchange="app.toggleLimitUnlock(this.checked)"> Unlock Limits (Divined)
             </label>
         `;
-        container.appendChild(ascendedDiv);
+        container.appendChild(unlockDiv);
         
+        // --- FIX END ---
+
         // Position Inputs
         const posGroup = document.createElement('div');
         posGroup.className = 'form-group';
@@ -986,16 +1021,13 @@ class RelicEditor {
         posGroup.appendChild(row);
         container.appendChild(posGroup);
 
-        const currentTier = item._tier;
         const currentLevel = item._upgradeLevel;
-
-        // Ensure arrays exist so we can add to them
         if (!item._affixesData) item._affixesData = [];
         if (!item._implicitAffixesData) item._implicitAffixesData = [];
 
-        // Render Lists (Always called to show Add buttons)
-        this.renderAffixList(container, item._affixesData, "Affixes", currentTier, currentLevel);
-        this.renderImplicitAffixList(container, item._implicitAffixesData, "Implicit Affixes", currentTier, currentLevel);
+        // Pass the 'isUnlocked' flag to the renderers instead of reading item._ascended
+        this.renderAffixList(container, item._affixesData, "Affixes", currentTier, currentLevel, isUnlocked);
+        this.renderImplicitAffixList(container, item._implicitAffixesData, "Implicit Affixes", currentTier, currentLevel, isUnlocked);
     }
 
     // --- MODAL LOGIC START ---
@@ -1164,6 +1196,14 @@ class RelicEditor {
         const btn = document.createElement('button');
         btn.className = 'btn-select-affix';
         
+        // --- DIRECT STYLE FIX ---
+        // Force dark theme colors by default
+        btn.style.backgroundColor = '#161b22';
+        btn.style.borderColor = '#30363d';
+        btn.style.color = '#c9d1d9';
+        btn.style.textAlign = 'left';
+        // ------------------------
+        
         // Show current name on the button
         const currentName = this.definitions.affixes[selectedId] 
             ? this.getAffixName(selectedId) 
@@ -1182,7 +1222,7 @@ class RelicEditor {
         return div;
     }
 
-    renderAffixList(container, affixes, title, tier, level) {
+    renderAffixList(container, affixes, title, tier, level, isUnlocked) {
         if (!affixes) return;
         
         container.appendChild(document.createElement('hr'));
@@ -1233,11 +1273,9 @@ class RelicEditor {
                 this.renderInspector();
             }));
 
-            // Slider
-            const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-            const item = loadout.Items[this.selectedRelicIndex];
-            const isDivine = item._ascended;
-            const maxVal = Math.max(1.0, affix._rollValue, isDivine ? 1.2 : 1.0);
+            // --- FIX: Slider Range Logic ---
+            // Decoupled from item._ascended. Uses UI-only 'isUnlocked' flag.
+            const maxVal = Math.max(1.0, affix._rollValue, isUnlocked ? 1.2 : 1.0);
             
             const sliderGroup = document.createElement('div');
             sliderGroup.className = 'form-group';
@@ -1262,15 +1300,17 @@ class RelicEditor {
             slider.oninput = (e) => {
                 const val = parseFloat(e.target.value);
                 affix._rollValue = val;
-                numInput.value = val;
+                numInput.value = val.toFixed(3);
                 if (range) {
                     div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
                 }
             };
             numInput.onchange = (e) => {
                 let val = parseFloat(e.target.value);
-                if (val > maxVal && !isDivine) val = maxVal; 
+                // Clamp to the dynamic maxVal we calculated above
+                if (val > maxVal) val = maxVal; 
                 affix._rollValue = val;
+                e.target.value = val.toFixed(3);
                 slider.value = val;
                 this.renderInspector(); 
             };
@@ -1290,7 +1330,7 @@ class RelicEditor {
             `;
             div.appendChild(lockCheck);
 
-            // FOOTER: Remove Button (Moved Here)
+            // Footer
             const footer = document.createElement('div');
             footer.className = 'affix-footer';
             
@@ -1305,7 +1345,7 @@ class RelicEditor {
             list.appendChild(div);
         });
 
-        // Add Button (Outside Loop)
+        // Add Button
         const btnAdd = document.createElement('button');
         btnAdd.className = 'btn-add';
         btnAdd.textContent = '+ Add Affix';
@@ -1315,24 +1355,130 @@ class RelicEditor {
         container.appendChild(list);
     }
 
-    renderImplicitAffixList(container, implicitData, title, tier, level) {
+    getImplicitCategoryName(catId) {
+        switch(catId) {
+            case 0: return "Fury";       
+            case 1: return "Faith";      
+            case 2: return "Discipline";
+            case 3: return "Corrupted";
+            default: return "None";
+        }
+    }
+
+    renderImplicitAffixList(container, implicitData, title, tier, level, isUnlocked) {
         if (!implicitData || implicitData.length === 0) return;
 
         container.appendChild(document.createElement('hr'));
-        container.appendChild(Object.assign(document.createElement('h4'), {textContent: title}));
+        // Add count to header so you see "Implicit Affixes (4)"
+        container.appendChild(Object.assign(document.createElement('h4'), {
+            textContent: `${title} (${implicitData.length})`
+        }));
         
         const list = document.createElement('div');
         list.className = 'affix-list';
 
-        implicitData.forEach((impObj, idx) => {
-            const affix = impObj._relicAffixData;
-            const div = document.createElement('div');
-            div.className = 'affix-item';
-            div.style.borderColor = '#007acc';
+        // Shortcut to mapping data
+        const mapping = this.data.implicit_mapping;
 
+        implicitData.forEach((impObj, idx) => {
+            // --- NEW: GAME LIMIT WARNING ---
+            // Insert a warning separator before the 4th item (index 3)
+            if (idx === 3) {
+                const limitWarning = document.createElement('div');
+                limitWarning.style.color = '#d29922'; // Orange
+                limitWarning.style.textAlign = 'center';
+                limitWarning.style.fontSize = '0.75em';
+                limitWarning.style.fontWeight = 'bold';
+                limitWarning.style.margin = '15px 0 5px 0';
+                limitWarning.style.borderTop = '1px dashed #d29922';
+                limitWarning.style.paddingTop = '5px';
+                limitWarning.innerHTML = '⚠ GAME DISPLAY LIMIT (TOP 3 SHOWN) ⚠';
+                list.appendChild(limitWarning);
+            }
+            // -------------------------------
+
+            const affix = impObj._relicAffixData;
             const defId = affix._relicAffixDefinitionId;
             const def = this.definitions.affixes[defId];
 
+            // --- 1. AUTO-DETECT LOGIC ---
+            const range = this.getAffixRange(defId, tier);
+            
+            // Rule A: Corrupted (Min == Max)
+            if (range && range[0] === range[1]) {
+                impObj._eImplicitAffixCategory = 3; 
+            }
+            // Rule B: Standard (Check Map or Default to -1)
+            else if (impObj._eImplicitAffixCategory === undefined || impObj._eImplicitAffixCategory === null) {
+                 if (mapping && mapping[defId] !== undefined) {
+                     impObj._eImplicitAffixCategory = mapping[defId];
+                 } else {
+                     impObj._eImplicitAffixCategory = -1; 
+                 }
+            }
+
+            const div = document.createElement('div');
+            div.className = 'affix-item';
+
+            // 2. VISUALS
+            const catColors = {
+                0: '#e5534b', // Fury
+                1: '#58a6ff', // Faith
+                2: '#3fb950', // Discipline
+                3: '#a371f7', // Corrupted
+                [-1]: '#888888' // None
+            };
+
+            const currentCat = impObj._eImplicitAffixCategory;
+            const currentColor = catColors[currentCat] || '#888888';
+            
+            div.style.borderColor = currentColor;
+            div.style.borderLeftWidth = '5px'; 
+            // Dim items past the limit slightly to indicate they might be inactive
+            if (idx >= 3) div.style.opacity = '0.6'; 
+
+            // 3. TYPE HEADER
+            const catHeader = document.createElement('div');
+            catHeader.style.marginBottom = '8px';
+            catHeader.style.display = 'flex';
+            catHeader.style.alignItems = 'center';
+            
+            const catLabel = document.createElement('span');
+            catLabel.style.fontSize = '0.7em';
+            catLabel.style.color = '#888';
+            catLabel.style.marginRight = '6px';
+            catLabel.textContent = "TYPE:";
+            
+            const catSelect = document.createElement('select');
+            catSelect.style.backgroundColor = 'transparent';
+            catSelect.style.color = currentColor;
+            catSelect.style.border = 'none';
+            catSelect.style.fontSize = '0.75em';
+            catSelect.style.fontWeight = 'bold';
+            catSelect.style.textTransform = 'uppercase';
+            catSelect.style.cursor = 'pointer';
+            catSelect.style.outline = 'none';
+            
+            [-1, 0, 1, 2, 3].forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = this.getImplicitCategoryName(id);
+                opt.style.backgroundColor = '#161b22';
+                opt.style.color = catColors[id] || '#888';
+                if (currentCat === id) opt.selected = true;
+                catSelect.appendChild(opt);
+            });
+
+            catSelect.onchange = (e) => {
+                impObj._eImplicitAffixCategory = parseInt(e.target.value);
+                this.renderInspector(); 
+            };
+
+            catHeader.appendChild(catLabel);
+            catHeader.appendChild(catSelect);
+            div.appendChild(catHeader);
+
+            // 4. Name Label
             const nameLabel = document.createElement('label');
             nameLabel.style.color = '#add8e6';
             nameLabel.innerHTML = this.getAffixName(defId);
@@ -1340,13 +1486,11 @@ class RelicEditor {
             const override = this.getAdditiveOverrideConfig(def);
             if (!override) {
                 const mult = this.getUpgradeMultiplier(level, def);
-                if(mult > 1.0) {
-                     nameLabel.innerHTML += ` <span class="multiplier-tag">x${mult}</span>`;
-                }
+                if(mult > 1.0) nameLabel.innerHTML += ` <span class="multiplier-tag">x${mult}</span>`;
             }
             div.appendChild(nameLabel);
 
-            const range = this.getAffixRange(defId, tier);
+            // 5. Range Display
             if (range) {
                 const realVal = document.createElement('span');
                 realVal.className = 'calculated-value';
@@ -1359,16 +1503,30 @@ class RelicEditor {
                 div.insertBefore(rangeInfo, nameLabel);
             }
 
-            div.appendChild(this.createAffixSelect('Affix Name', defId, (v) => {
-                affix._relicAffixDefinitionId = parseInt(v);
+            // 6. Affix Selector (Callback)
+            const affixSelectWrapper = this.createAffixSelect('Affix Name', defId, (v) => {
+                const newId = parseInt(v);
+                affix._relicAffixDefinitionId = newId;
+
+                // RE-RUN LOGIC ON CHANGE
+                const newRange = this.getAffixRange(newId, tier);
+
+                if (newRange && newRange[0] === newRange[1]) {
+                    impObj._eImplicitAffixCategory = 3; // Corrupted
+                } else if (mapping && mapping[newId] !== undefined) {
+                    impObj._eImplicitAffixCategory = mapping[newId]; // Mapped
+                } else {
+                    impObj._eImplicitAffixCategory = -1; // Unknown
+                }
+
                 this.renderInspector();
-            }));
+            });
 
-            const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-            const item = loadout.Items[this.selectedRelicIndex];
-            const isDivine = item._ascended;
-            const maxVal = Math.max(1.0, affix._rollValue, isDivine ? 1.2 : 1.0);
+            const innerBtn = affixSelectWrapper.querySelector('button');
+            div.appendChild(affixSelectWrapper);
 
+            // 7. Slider
+            const maxVal = Math.max(1.0, affix._rollValue, isUnlocked ? 1.2 : 1.0);
             const sliderGroup = document.createElement('div');
             sliderGroup.className = 'form-group';
             sliderGroup.innerHTML = `<label>Roll Coefficient</label>`;
@@ -1391,13 +1549,14 @@ class RelicEditor {
             slider.oninput = (e) => {
                 const val = parseFloat(e.target.value);
                 affix._rollValue = val;
-                numInput.value = val;
-                if(range) {
-                    div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
-                }
+                numInput.value = val.toFixed(3);
+                if(range) div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
             };
             numInput.onchange = (e) => {
-                affix._rollValue = parseFloat(e.target.value);
+                let val = parseFloat(e.target.value);
+                if (val > maxVal) val = maxVal;
+                affix._rollValue = val;
+                e.target.value = val.toFixed(3);
                 slider.value = affix._rollValue;
                 this.renderInspector();
             };
@@ -1407,10 +1566,9 @@ class RelicEditor {
             sliderGroup.appendChild(sliderContainer);
             div.appendChild(sliderGroup);
 
-            // FOOTER: Remove Button (Moved Here)
+            // 8. Remove
             const footer = document.createElement('div');
             footer.className = 'affix-footer';
-
             const btnRemove = document.createElement('button');
             btnRemove.className = 'btn-remove';
             btnRemove.textContent = 'Remove';
@@ -1422,7 +1580,6 @@ class RelicEditor {
             list.appendChild(div);
         });
 
-        // Add Implicit Button
         const btnAdd = document.createElement('button');
         btnAdd.className = 'btn-add';
         btnAdd.textContent = '+ Add Implicit';
