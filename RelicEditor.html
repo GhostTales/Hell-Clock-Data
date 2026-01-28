@@ -450,6 +450,20 @@
             border-color: var(--accent-color);
         }
 
+        .relic-item.dragging {
+            opacity: 0.9;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100 !important;
+            cursor: grabbing;
+            transition: none; /* Disable transition for instant follow response */
+            pointer-events: none; /* Important for mouse tracking */
+        }
+
+        /* Ensure the container catches mouse events when item has pointer-events: none */
+        .inventory-grid {
+            user-select: none; /* Prevent text selection while dragging */
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar { width: 10px; height: 10px; }
         ::-webkit-scrollbar-track { background: var(--bg-color); border-left: 1px solid var(--border-color); }
@@ -697,6 +711,159 @@ class RelicEditor {
         return this.definitions.sizes[relicDef.eRelicSize] || this.definitions.sizes.Default;
     }
 
+    isValidPosition(targetItemIndex, targetX, targetY, loadout, gridWidth, gridHeight, validSlotsMask) {
+        const item = loadout.Items[targetItemIndex];
+        const def = this.definitions.relics[item._relicBaseDefinitionID];
+        const size = this.getRelicSize(def);
+
+        // 1. Boundary Check
+        if (targetX < 0 || targetY < 0) return false;
+        if (targetX + size.w > gridWidth) return false;
+        if (targetY + size.h > gridHeight) return false;
+
+        // 2. Blocked Slot Check (The shape mask)
+        // iterate over every cell this relic would occupy
+        for (let w = 0; w < size.w; w++) {
+            for (let h = 0; h < size.h; h++) {
+                const checkX = targetX + w;
+                const checkY = targetY + h;
+
+            // Convert XY to linear index for the shape mask array
+            // Note: The mask usually runs row by row from top-left. 
+            // Your grid renders rows 0..Height.
+            // Visual Y increases downwards. Internal Y increases Upwards.
+            // We need to map Internal Y back to Visual Row to check the mask.
+                const visualRow = gridHeight - 1 - checkY;
+                const maskIndex = visualRow * gridWidth + checkX;
+
+            if (!validSlotsMask[maskIndex]) return false; // Slot is blocked
+            }
+        }
+
+        // 3. Overlap Check with other items
+        for (let i = 0; i < loadout.Items.length; i++) {
+            if (i === targetItemIndex) continue; // Don't check against self
+
+            const other = loadout.Items[i];
+            const otherDef = this.definitions.relics[other._relicBaseDefinitionID];
+            const otherSize = this.getRelicSize(otherDef);
+
+            // AABB Collision Detection
+            const noOverlap = 
+                targetX >= other._position.x + otherSize.w || // Target is to the right
+                targetX + size.w <= other._position.x ||      // Target is to the left
+                targetY >= other._position.y + otherSize.h || // Target is above
+                targetY + size.h <= other._position.y;        // Target is below
+
+            if (!noOverlap) return false; // Collision detected
+        }
+
+        return true;
+    }
+
+    initDrag(e, item, index, element) {
+        if (e.button !== 0) return; // Only left click
+    
+        // Prevent default browser drag behavior
+        e.preventDefault(); 
+    
+        this.isDragging = true;
+        this.dragItemIndex = index;
+        this.dragElement = element;
+    
+        // Get Grid Metrics
+        const style = getComputedStyle(document.documentElement);
+        this.dragCellSize = parseInt(style.getPropertyValue('--grid-cell-size'));
+        this.dragGap = 4; // CSS gap
+        this.dragTotalUnit = this.dragCellSize + this.dragGap;
+
+        // Calculate mouse offset relative to the element's top-left corner
+        const rect = element.getBoundingClientRect();
+        this.dragOffsetX = e.clientX - rect.left;
+        this.dragOffsetY = e.clientY - rect.top;
+
+        // Helper for mouse move
+        this.boundMouseMove = (ev) => this.handleDragMove(ev);
+        this.boundMouseUp = (ev) => this.handleDragEnd(ev);
+
+        document.addEventListener('mousemove', this.boundMouseMove);
+        document.addEventListener('mouseup', this.boundMouseUp);
+
+        // Visuals
+        element.classList.add('dragging');
+        this.selectedRelicIndex = index; // Select item on start drag
+        this.renderInspector(); // Update inspector immediately
+    }
+
+    handleDragMove(e) {
+        if (!this.isDragging) return;
+
+        const container = document.getElementById('gridContainer');
+        const containerRect = container.getBoundingClientRect();
+
+        // Calculate new Position relative to container
+        let newLeft = e.clientX - containerRect.left - this.dragOffsetX;
+        let newTop = e.clientY - containerRect.top - this.dragOffsetY;
+
+        // Apply strictly visual update
+        this.dragElement.style.left = `${newLeft}px`;
+        this.dragElement.style.top = `${newTop}px`;
+    }
+
+    handleDragEnd(e) {
+        if (!this.isDragging) return;
+
+        this.isDragging = false;
+        document.removeEventListener('mousemove', this.boundMouseMove);
+        document.removeEventListener('mouseup', this.boundMouseUp);
+        this.dragElement.classList.remove('dragging');
+
+        // Restore pointer events so click handler can work if needed, 
+        // though we usually want to stop propagation if we dragged.
+    
+        // 1. Calculate Grid Coordinates
+        const container = document.getElementById('gridContainer');
+        const containerRect = container.getBoundingClientRect();
+    
+        // Position of the element relative to grid container (including padding logic if any)
+        // The grid has 10px padding in CSS, let's account for that:
+        const gridPadding = 10; 
+    
+        const relX = e.clientX - containerRect.left - this.dragOffsetX - gridPadding;
+        const relY = e.clientY - containerRect.top - this.dragOffsetY - gridPadding;
+
+        // Snap to nearest integer grid slot
+        const snappedX = Math.round(relX / this.dragTotalUnit);
+        const snappedVisualY = Math.round(relY / this.dragTotalUnit);
+
+        // 2. Convert Visual Y (Top-Down) to Data Y (Bottom-Up)
+        // Need grid dimensions again
+        const shapeConfig = this.data.config.playerInventoryShapeTiers;
+        const currentShape = shapeConfig[shapeConfig.length - 1];
+    
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const item = loadout.Items[this.dragItemIndex];
+        const def = this.definitions.relics[item._relicBaseDefinitionID];
+        const size = this.getRelicSize(def);
+
+        // Formula: VisualY = Height - DataY - ItemHeight
+        // Therefore: DataY = Height - VisualY - ItemHeight
+        const targetDataY = currentShape.height - snappedVisualY - size.h;
+    
+        // 3. Validate
+        if (this.isValidPosition(this.dragItemIndex, snappedX, targetDataY, loadout, currentShape.width, currentShape.height, currentShape.shape)) {
+            // Success: Update Data
+            item._position.x = snappedX;
+            item._position.y = targetDataY;
+        } else {
+            // Fail: Do nothing, renderGrid will snap it back to original
+            console.log("Invalid placement");
+        }
+
+        this.renderGrid();
+        this.renderInspector(); // Update X/Y inputs in sidebar
+    }
+
     renderGrid() {
         const container = document.getElementById('gridContainer');
         container.innerHTML = '';
@@ -740,11 +907,10 @@ class RelicEditor {
 
             el.innerHTML = `<strong>${def ? this.extractName(def) : 'Unknown'}</strong>`;
             
-            el.onclick = (e) => {
-                e.stopPropagation();
-                this.selectedRelicIndex = index;
-                this.renderGrid();
-                this.renderInspector();
+            el.onmousedown = (e) => {
+                e.stopPropagation(); // Stop grid interaction
+                // Start Drag Logic
+                this.initDrag(e, item, index, el);
             };
 
             container.appendChild(el);
@@ -1004,27 +1170,6 @@ class RelicEditor {
         `;
         container.appendChild(unlockDiv);
         
-        // --- FIX END ---
-
-        // Position Inputs
-        const posGroup = document.createElement('div');
-        posGroup.className = 'form-group';
-        posGroup.innerHTML = '<label>Position (X, Y)</label>';
-        const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.gap = '10px';
-        
-        const xIn = document.createElement('input'); xIn.type = 'number'; xIn.value = item._position.x;
-        xIn.onchange = (e) => { item._position.x = parseInt(e.target.value); this.renderGrid(); };
-        
-        const yIn = document.createElement('input'); yIn.type = 'number'; yIn.value = item._position.y;
-        yIn.onchange = (e) => { item._position.y = parseInt(e.target.value); this.renderGrid(); };
-
-        row.appendChild(xIn);
-        row.appendChild(yIn);
-        posGroup.appendChild(row);
-        container.appendChild(posGroup);
-
         const currentLevel = item._upgradeLevel;
         if (!item._affixesData) item._affixesData = [];
         if (!item._implicitAffixesData) item._implicitAffixesData = [];
