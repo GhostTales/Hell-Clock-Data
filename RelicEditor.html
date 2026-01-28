@@ -910,6 +910,10 @@ class RelicEditor {
                 return `+${((finalVal - 1.0) * 100).toFixed(2)}%`;
             }
 
+            if (finalVal > 0 && finalVal <= 1.0) {
+                return `+${(finalVal * 100).toFixed(2)}%`;
+            }
+
             return `+${finalVal.toFixed(2)}`;
         }
 
