@@ -589,6 +589,36 @@
         .tag-faith { color: #58a6ff; border-color: rgba(88, 166, 255, 0.4); background: rgba(88, 166, 255, 0.1); }
         .tag-discipline { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.1); }
 
+        /* Splash Overlay */
+        .upload-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+
+        .upload-prompt-card {
+            background: var(--panel-bg);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .upload-prompt-card h2 {
+            color: var(--accent-color);
+            margin-top: 0;
+        }
+
 
     </style>
 </head>
@@ -636,7 +666,7 @@
     <div class="stash-panel">
         <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
             <h4 style="border:none; margin:0; padding:0;">Relic Stash</h4>
-            <button onclick="app.openCreationModal()" class="btn-add" style="width: auto; padding: 4px 10px; margin:0; font-size: 0.8em;">+ Create</button>
+            <button onclick="app.openCreationModal()" class="btn-add" style="width: auto; padding: 4px 10px; margin:0; font-size: 0.8em;">Create Relic</button>
         </div>
         <p style="font-size:0.8em; color:#8b949e; margin-top:-10px;">
             Drag items here to store them. Items in stash are NOT exported.
@@ -707,6 +737,16 @@
     </div>
 </div>
 
+<div id="uploadOverlay" class="upload-overlay">
+    <div class="upload-prompt-card">
+        <h2>Welcome to Relic Editor</h2>
+        <p>Please upload your <strong>PlayerSave0.json</strong> to begin.</p>
+        <button onclick="document.getElementById('inp-save').click()" style="margin-top: 20px; padding: 10px 24px; font-size: 1rem;">
+            Select Save File
+        </button>
+    </div>
+</div>
+
 <script>
 class RelicEditor {
     constructor() {
@@ -737,8 +777,8 @@ class RelicEditor {
         };
 
         this.stashItems = []; // Items here are NOT in this.data.save
-        this.stashWidth = 8;  
-        this.stashHeight = 100; // Arbitrary height
+        this.stashWidth = 6;  
+        this.stashHeight = 50; // Arbitrary height
         this.stashCellSize = 60;
         this.deletedItemHistory = [];
 
@@ -798,7 +838,6 @@ class RelicEditor {
         const cellSizeSlider = document.querySelector('input[type="range"][min="65"]');
         if (cellSizeSlider) {
             cellSizeSlider.value = 80; // Ensure visual handle is at 80
-            this.updateGridSettings(80); // Ensure grid renders at 80
         }
     }
 
@@ -852,6 +891,7 @@ class RelicEditor {
 
     initEditorUI() {
         const saveData = this.data.save._relicLoadoutsSaveData;
+        document.getElementById('uploadOverlay').style.display = 'none';
         const select = document.getElementById('loadoutSelect');
         select.innerHTML = '';
         select.disabled = false;
@@ -1317,6 +1357,7 @@ class RelicEditor {
     }
 
     renderGrid() {
+        if (!this.data.save || !this.data.config) return;
         const container = document.getElementById('gridContainer');
         container.innerHTML = '';
 
@@ -1462,25 +1503,28 @@ class RelicEditor {
 
         if (corrupted) {
             if (Number.isInteger(min) && Number.isInteger(max)) {
-                return `+${baseVal.toFixed(2)}`;
+                return `${baseVal < 0 ? "" : "+"}${baseVal.toFixed(2)}`;
             }
 
             if (modType === "Multiplicative") {
                 finalVal = baseVal * (multiplier || 1);
-                return `+${(finalVal * 100).toFixed(2)}%`;
+                return `${finalVal < 0 ? "" : "+"}${(finalVal * 100).toFixed(2)}%`;
             }
 
             finalVal = baseVal + (multiplier || 0);
 
-            if (finalVal >= 1.0 && finalVal <= 2.0 && max <= 2.0) {
-                return `+${((finalVal - 1.0) * 100).toFixed(2)}%`;
+            // Added Math.abs to checks to handle negative 1.x stats (e.g. -1.5)
+            if (Math.abs(finalVal) >= 1.0 && Math.abs(finalVal) <= 2.0 && Math.abs(max) <= 2.0) {
+                // Subtracts 1.0 for positive, Adds 1.0 for negative to normalize
+                return `${finalVal < 0 ? "" : "+"}${((finalVal - Math.sign(finalVal)) * 100).toFixed(2)}%`;
             }
 
-            if (finalVal > 0 && finalVal <= 1.0) {
-                return `+${(finalVal * 100).toFixed(2)}%`;
+            // Added Math.abs to allow negative percentages (e.g. -0.5)
+            if (Math.abs(finalVal) > 0 && Math.abs(finalVal) <= 1.0) {
+                return `${finalVal < 0 ? "" : "+"}${(finalVal * 100).toFixed(2)}%`;
             }
 
-            return `+${finalVal.toFixed(2)}`;
+            return `${finalVal < 0 ? "" : "+"}${finalVal.toFixed(2)}`;
         }
 
         // Non-corrupted
@@ -1490,16 +1534,16 @@ class RelicEditor {
             finalVal = baseVal * multiplier;
         }
 
-        // Normalize 1.x stats
-        if (max <= 2.0 && min > 1.0) {
-            finalVal -= 1.0;
+        // Normalize 1.x stats (Math.abs added to checks)
+        if (Math.abs(max) <= 2.0 && Math.abs(min) > 1.0) {
+            finalVal -= Math.sign(finalVal);
         }
 
-        if (max <= 2.0) {
-            return `+${(finalVal * 100).toFixed(2)}%`;
+        if (Math.abs(max) <= 2.0) {
+            return `${finalVal < 0 ? "" : "+"}${(finalVal * 100).toFixed(2)}%`;
         }
 
-        return `+${finalVal.toFixed(2)}`;
+        return `${finalVal < 0 ? "" : "+"}${finalVal.toFixed(2)}`;
     }
 
     toggleLimitUnlock(isChecked) {
@@ -1872,8 +1916,9 @@ class RelicEditor {
                 // If Override exists: Show Additive Tag (e.g., +15)
                 const val = parseFloat(overrideConfig[level] || 0);
                 if (val !== 0) {
-                     // Using a slightly different style for additive to distinguish it
-                     nameLabel.innerHTML += ` <span class="multiplier-tag" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">+${val}</span>`;
+                     // Check if positive to add '+', otherwise negative numbers include '-' automatically
+                     const displayVal = val >= 0 ? `+${val}` : val;
+                     nameLabel.innerHTML += ` <span class="multiplier-tag" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">${displayVal}</span>`;
                 }
             } else {
                 // If No Override: Show Multiplier Tag (e.g., x1.5)
@@ -2125,7 +2170,8 @@ class RelicEditor {
             if (overrideConfig) {
                 const val = parseFloat(overrideConfig[level] || 0);
                 if (val !== 0) {
-                     nameLabel.innerHTML += ` <span class="multiplier-tag" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">+${val}</span>`;
+                    const displayVal = val >= 0 ? `+${val}` : val;
+                    nameLabel.innerHTML += ` <span class="multiplier-tag" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">+${displayVal}</span>`;
                 }
             } else {
                 const mult = this.getUpgradeMultiplier(level, def);
