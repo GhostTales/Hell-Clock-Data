@@ -92,7 +92,7 @@
         }
 
         .sidebar {
-            width: 200px;
+            width: 240px;
             background-color: var(--panel-bg);
             border-right: 1px solid var(--border-color);
             padding: 20px;
@@ -100,6 +100,52 @@
             flex-direction: column;
             gap: 15px;
             overflow-y: auto;
+        }
+
+        .sidebar-section {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        kbd {
+            background-color: #21262d;
+            border: 1px solid #6e7681;
+            border-bottom-color: #484f58;
+            border-radius: 4px;
+            box-shadow: inset 0 -1px 0 #484f58;
+            color: var(--text-color);
+            display: inline-block;
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            font-size: 0.75em;
+            line-height: 1;
+            padding: 3px 6px;
+            vertical-align: middle;
+        }
+
+        .shortcut-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+            color: var(--text-muted);
+            padding: 4px 0;
         }
 
         .editor-area {
@@ -142,20 +188,24 @@
         }
 
         .file-upload-btn {
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
-            color: var(--accent-color);
-            padding: 8px;
-            cursor: pointer;
-            font-size: 0.9em;
+            background-color: #1f6feb; /* Primary Blue */
+            color: white;
+            border: 1px solid rgba(240,246,252,0.1);
+            font-weight: 500;
+            padding: 8px 12px;
             text-align: center;
-            display: block;
             border-radius: 6px;
-            transition: 0.2s;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        
+
         .file-upload-btn:hover {
-            border-color: var(--accent-color);
+            background-color: #388bfd;
+            border-color: transparent;
         }
         
         .file-upload-btn.disabled {
@@ -319,10 +369,81 @@
         }
 
         input[type=range] {
-            flex: 1;
-            accent-color: var(--accent-color);
+            -webkit-appearance: none;
+            width: 100%;
+            height: 24px;
             background: transparent;
             cursor: pointer;
+            margin: 0;
+        }
+
+        input[type=range]:focus { outline: none; }
+
+        /* --- Chrome / Edge / Safari (The Gradient Trick) --- */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            border: 1px solid #30363d;
+            
+            /* We use a CSS variable (--range-percent) to tell the gradient where to stop.
+               Blue on the left, Dark on the right.
+            */
+            background: linear-gradient(to right, 
+                var(--accent-color) 0%, 
+                var(--accent-color) var(--range-percent, 0%), 
+                #0d1117 var(--range-percent, 0%), 
+                #0d1117 100%
+            );
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #c9d1d9;
+            border: 2px solid #21262d;
+            margin-top: -6px; /* Center thumb on 6px track */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]:hover::-webkit-slider-thumb {
+            background: var(--accent-color);
+            transform: scale(1.1);
+            border-color: #fff;
+        }
+
+        /* --- Firefox (Native Support) --- */
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            background: #0d1117; /* Empty part */
+            border: 1px solid #30363d;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-moz-range-progress {
+            background-color: var(--accent-color); /* Filled part */
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-moz-range-thumb {
+            height: 16px;
+            width: 16px;
+            border: 2px solid #21262d;
+            border-radius: 50%;
+            background: #c9d1d9;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        input[type=range]:hover::-moz-range-thumb {
+            background: var(--accent-color);
+            transform: scale(1.1);
+            border-color: #fff;
         }
 
         .calculated-value {
@@ -632,41 +753,53 @@
 
 <div class="main-content">
     <div class="sidebar">
-        <h4>Database Status</h4>
-        <div class="status-item">
-            <span>Relics DB</span> <span id="status-relics" class="status-pending">Loading...</span>
-        </div>
-        <div class="status-item">
-            <span>Affixes DB</span> <span id="status-affixes" class="status-pending">Loading...</span>
-        </div>
-        <div class="status-item">
-            <span>Config DB</span> <span id="status-config" class="status-pending">Loading...</span>
-        </div>
-        
-        <h4>Save File</h4>
-        <div class="form-group">
+        <div class="sidebar-section">
+            <div class="sidebar-title">Save Management</div>
+            
             <label class="file-upload-btn" id="lbl-save">
-                Select File
+                <span>Load Save File</span>
                 <input type="file" id="inp-save" onchange="app.loadSaveFile(this)" disabled>
             </label>
+            
+            <select id="loadoutSelect" onchange="app.switchLoadout()" disabled style="background-color: #0d1117;">
+                <option>Load save first...</option>
+            </select>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-title">View Settings</div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 5px;">
+                <span>Grid Zoom</span>
+                <span id="cellSizeDisplay" style="color: var(--accent-color);">80px</span>
+            </div>
+            <input type="range" min="65" max="95" value="80" 
+               style="--range-percent: 50%"
+               oninput="app.updateGridSettings(this.value); app.updateSliderFill(this)">
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-title">Controls</div>
+            
+            <div class="shortcut-row">
+                <span>Undo Delete</span>
+                <span><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>
+            </div>
+            
+            <div class="shortcut-row">
+                <span>Clone Item</span>
+                <span><kbd>Right Click</kbd></span>
+            </div>
+
+            <div class="shortcut-row">
+                <span>Move Item</span>
+                <span><kbd>Left Drag</kbd></span>
+            </div>
         </div>
         
-        <h4>Loadout Selection</h4>
-        <select id="loadoutSelect" onchange="app.switchLoadout()" disabled>
-            <option>Load save file first...</option>
-        </select>
+        <div style="flex:1"></div>
 
-        <div style="margin-top: 10px;">
-            <label>Cell Size: <span id="cellSizeDisplay">80px</span></label>
-            <input type="range" min="65" max="95" value="80" 
-                   oninput="app.updateGridSettings(this.value)">
-        </div>
-        <h4>Shortcuts</h4>
-        <div>
-            <label>Ctrl + Z: undo last deletion</label>
-            <label>Right click copy</label>
-        </div>
-
+        
     </div>
 
     <div class="stash-panel">
@@ -1983,6 +2116,7 @@ class RelicEditor {
                 const val = parseFloat(e.target.value);
                 affix._rollValue = val;
                 numInput.value = val.toFixed(3);
+                this.updateSliderFill(e.target);
                 if (range) {
                     div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
                 }
@@ -2254,6 +2388,7 @@ class RelicEditor {
                 const val = parseFloat(e.target.value);
                 affix._rollValue = val;
                 numInput.value = val.toFixed(3);
+                this.updateSliderFill(e.target);
                 if(range) div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
             };
             numInput.onchange = (e) => {
@@ -2759,6 +2894,19 @@ class RelicEditor {
         const rect = el.getBoundingClientRect();
         this.dragOffsetX = e.clientX - rect.left;
         this.dragOffsetY = e.clientY - rect.top;
+    }
+
+    updateSliderFill(input) {
+        if (!input) return;
+        const min = parseFloat(input.min) || 0;
+        const max = parseFloat(input.max) || 100;
+        const val = parseFloat(input.value) || 0;
+        
+        // Calculate percentage (0 to 100)
+        const percent = ((val - min) / (max - min)) * 100;
+        
+        // Set the CSS variable on the input element
+        input.style.setProperty('--range-percent', `${percent}%`);
     }
 
 }
