@@ -30,15 +30,25 @@
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-title">View Settings</div>
+            <div class="sidebar-title">Settings</div>
             
             <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 5px;">
                 <span>Grid Zoom</span>
                 <span id="cellSizeDisplay" style="color: var(--accent-color);">80px</span>
             </div>
             <input type="range" min="65" max="95" value="80" 
-               style="--range-percent: 50%"
-               oninput="app.updateGridSettings(this.value); app.updateSliderFill(this)">
+                   style="--range-percent: 50%"
+                   oninput="app.updateGridSettings(this.value); app.updateSliderFill(this)">
+
+            <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                <label style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 0.85em;">
+                    <span>Restrict Affixes</span>
+                    <input type="checkbox" id="chk-restrict" checked onchange="app.toggleRestrictions(this)">
+                </label>
+                <p style="font-size: 0.75em; color: #8b949e; margin: 4px 0 0 0;">
+                    Enforce affix limits and pools.
+                </p>
+            </div>
         </div>
 
         <div class="sidebar-section">
@@ -240,14 +250,22 @@ class RelicEditor {
             await Promise.all(promises);
             this.processDefinitions();
             this.enableSaveUpload();
+
+            const cellSizeSlider = document.querySelector('input[type="range"][min="65"]');
+            if (cellSizeSlider) {
+                // Apply the visual value (80) to the CSS variable immediately
+                this.updateGridSettings(cellSizeSlider.value); 
+                this.updateSliderFill(cellSizeSlider);
+            }
+
+            const restrictCheckbox = document.getElementById('chk-restrict');
+            if (restrictCheckbox) {
+                // Ensure internal state matches the HTML 'checked' attribute
+                this.restrictAffixes = restrictCheckbox.checked; 
+            }
             
         } catch (error) {
             alert("Error loading data files. Please check the 'relic_data' folder exists.");
-        }
-
-        const cellSizeSlider = document.querySelector('input[type="range"][min="65"]');
-        if (cellSizeSlider) {
-            cellSizeSlider.value = 80; // Ensure visual handle is at 80
         }
     }
 
@@ -1028,10 +1046,37 @@ class RelicEditor {
         if (!item._affixesData) item._affixesData = [];
         if (!item._implicitAffixesData) item._implicitAffixesData = [];
 
+        const isPriFull = this.hasReachedAffixLimit(item, 'primary');
+        const isSecFull = this.hasReachedAffixLimit(item, 'secondary');
+
+        // Create Button Configs
+        const explicitButtons = [
+            {
+                label: '+ Primary',
+                disabled: isPriFull,
+                onClick: () => {
+                    this.activeAffixType = 'primary';
+                    // Open modal in "Selection Mode" (pass null as ID)
+                    this.openAffixModal(null, (id) => this.addSpecificAffix(id));
+                }
+            },
+            {
+                label: '+ Secondary',
+                disabled: isSecFull,
+                onClick: () => {
+                    this.activeAffixType = 'secondary';
+                    this.openAffixModal(null, (id) => this.addSpecificAffix(id));
+                }
+            }
+        ];
+
         // Pass the 'isUnlocked' flag to the renderers instead of reading item._ascended
-        this.renderAffixList(container, item._affixesData, "Affixes", currentTier, currentLevel, isUnlocked);
+        this.renderAffixList(container, item._affixesData, "Affixes", currentTier, currentLevel, isUnlocked, explicitButtons);
         this.renderImplicitAffixList(container, item._implicitAffixesData, "Implicit Affixes", currentTier, currentLevel, isUnlocked);
     }
+
+
+
 
     // --- MODAL LOGIC START ---
     
@@ -1104,6 +1149,17 @@ class RelicEditor {
         const filterType = document.getElementById('affixFilterSelect').value; 
         const mapping = this.data.implicit_mapping || {};
 
+        // --- NEW: RESTRICTION LOGIC ---
+        let allowedIds = null;
+        if (this.restrictAffixes && this.activeAffixType && this.selectedRelicIndex !== -1) {
+             const item = this.getSelectedItem();
+             if (item) {
+                 // activeAffixType should be 'primary' or 'secondary'
+                 allowedIds = this.getAllowedAffixIds(item._relicBaseDefinitionID, this.activeAffixType);
+             }
+        }
+        // ------------------------------
+
         const queryTokens = rawQuery.split(/[\s-]+/).filter(t => t.length > 0);
 
         const filtered = this.allAffixOptions.filter(opt => {
@@ -1111,7 +1167,12 @@ class RelicEditor {
             const name = opt.name.toLowerCase();
             const id = String(opt.id);
 
-            // --- FILTER CHECK ---
+            // --- NEW: POOL CHECK ---
+            if (allowedIds && !allowedIds.includes(def.id)) {
+                return false;
+            }
+
+            // --- EXISTING FILTER CHECK ---
             let typeMatch = true;
             if (filterType !== 'all') {
                 const isUnique = def.eAffixRarity === 'Unique';
@@ -1121,8 +1182,7 @@ class RelicEditor {
                 const mapId = mapping[def.id];
                 const isSpecificType = mapId !== undefined && mapId !== 3;
 
-                // Corrupted Filter Logic:
-                // Must be Fixed Range AND NOT Unique/Special AND NOT Fury/Faith/Discipline
+                // Corrupted Filter Logic
                 const isCorrupted = isFixedRange && !isUnique && !isSpecial && !isSpecificType;
                 
                 switch (filterType) {
@@ -1140,7 +1200,7 @@ class RelicEditor {
 
             if (!typeMatch) return false;
 
-            // --- SEARCH TEXT CHECK ---
+            // --- EXISTING SEARCH TEXT CHECK ---
             if (queryTokens.length === 0) return true;
 
             if (name.includes(rawQuery) || id.includes(rawQuery)) {
@@ -1253,6 +1313,10 @@ class RelicEditor {
 
     // --- MODAL LOGIC END ---
 
+
+
+
+
     createAffixSelect(label, selectedId, onChange) {
         const div = document.createElement('div');
         div.className = 'form-group';
@@ -1289,7 +1353,7 @@ class RelicEditor {
         return div;
     }
 
-    renderAffixList(container, affixes, title, tier, level, isUnlocked) {
+    renderAffixList(container, affixes, title, tier, level, isUnlocked, customButtons = null) {
         if (!affixes) return;
 
         // Header Section
@@ -1311,17 +1375,43 @@ class RelicEditor {
         h4.style.textTransform = 'uppercase';
         h4.style.letterSpacing = '0.05em';
 
-        const btnAdd = document.createElement('button');
-        btnAdd.className = 'btn-add'; 
-        btnAdd.style.width = 'auto';
-        btnAdd.style.padding = '4px 10px';
-        btnAdd.style.fontSize = '0.8em';
-        btnAdd.style.marginTop = '0'; 
-        btnAdd.textContent = '+ Add Affix';
-        btnAdd.onclick = () => this.addAffix(false);
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '5px';
+
+        if (customButtons) {
+            customButtons.forEach(btnConfig => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-add';
+                btn.style.width = 'auto';
+                btn.style.padding = '4px 10px';
+                btn.style.fontSize = '0.8em';
+                btn.style.marginTop = '0';
+                btn.textContent = btnConfig.label;
+                btn.onclick = btnConfig.onClick;
+                if (btnConfig.disabled) {
+                    btn.disabled = true;
+                    btn.title = "Limit Reached";
+                    btn.style.opacity = "0.5";
+                    btn.style.cursor = "not-allowed";
+                }
+                buttonContainer.appendChild(btn);
+            });
+        } else {
+            // Fallback for Implicits if no custom buttons passed
+            const btnAdd = document.createElement('button');
+            btnAdd.className = 'btn-add'; 
+            btnAdd.style.width = 'auto';
+            btnAdd.style.padding = '4px 10px';
+            btnAdd.style.fontSize = '0.8em';
+            btnAdd.style.marginTop = '0'; 
+            btnAdd.textContent = '+ Add Affix';
+            btnAdd.onclick = () => this.addAffix(false);
+            buttonContainer.appendChild(btnAdd);
+        }
 
         headerRow.appendChild(h4);
-        headerRow.appendChild(btnAdd);
+        headerRow.appendChild(buttonContainer); // Append the container, not just one button
         container.appendChild(headerRow);
 
         const list = document.createElement('div');
@@ -1735,6 +1825,10 @@ class RelicEditor {
         a.remove();
     }
 
+
+
+
+
     // --- Relic Creation Logic ---
 
     openCreationModal() {
@@ -1915,6 +2009,10 @@ class RelicEditor {
         this.dragOffsetX = e.clientX - rect.left;
         this.dragOffsetY = e.clientY - rect.top;
     }
+
+
+
+
 
     // --- HELPERS ----
 
@@ -2192,6 +2290,65 @@ class RelicEditor {
         
         // Set the CSS variable on the input element
         input.style.setProperty('--range-percent', `${percent}%`);
+    }
+
+    toggleRestrictions(checkbox) {
+        this.restrictAffixes = checkbox.checked;
+        this.renderInspector(); // Refresh inspector to update button states
+    }
+
+    hasReachedAffixLimit(relicItem, type) {
+        if (!this.restrictAffixes) return false;
+
+        const def = this.definitions.relics[relicItem._relicBaseDefinitionID];
+        if (!def) return false;
+
+        // 1. Get Limit (JSON format is [min, max])
+        const limitRange = (type === 'primary') ? def.primaryAffixAmount : def.secondaryAffixAmount;
+        if (!limitRange) return false;
+        const limit = limitRange[1];
+        
+        // 2. Get the Pool of IDs for this type
+        const pool = (type === 'primary') ? def.primaryAffixPool : def.secondaryAffixPool;
+        if (!pool) return false;
+        
+        // Map pool objects to IDs for easy lookup
+        const poolIds = pool.map(entry => entry.value.id);
+
+        // 3. Count how many existing affixes belong to this pool
+        // We look at the single _affixesData list
+        const currentCount = (relicItem._affixesData || []).filter(affix => 
+            poolIds.includes(affix._relicAffixDefinitionId)
+        ).length;
+
+        return currentCount >= limit;
+    }
+
+    getAllowedAffixIds(relicBaseId, type) {
+        const def = this.definitions.relics[relicBaseId];
+        if (!def) return [];
+
+        const pool = (type === 'primary') ? def.primaryAffixPool : def.secondaryAffixPool;
+        
+        // Map the pool objects to just their Affix IDs
+        return pool.map(entry => entry.value.id);
+    }
+
+    addSpecificAffix(id) {
+        const item = this.getSelectedItem();
+        if (!item) return;
+        
+        const newAffix = {
+            _relicAffixDefinitionId: parseInt(id),
+            _rollValue: 0.5,
+            _locked: false,
+            _tier: item._tier || 1
+        };
+
+        if (!item._affixesData) item._affixesData = [];
+        item._affixesData.push(newAffix);
+        
+        this.renderInspector();
     }
 
 }
