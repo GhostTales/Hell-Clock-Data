@@ -656,11 +656,17 @@
             <option>Load save file first...</option>
         </select>
 
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 10px;">
             <label>Cell Size: <span id="cellSizeDisplay">80px</span></label>
             <input type="range" min="65" max="95" value="80" 
                    oninput="app.updateGridSettings(this.value)">
         </div>
+        <h4>Shortcuts</h4>
+        <div>
+            <label>Ctrl + Z: undo last deletion</label>
+            <label>Right click copy</label>
+        </div>
+
     </div>
 
     <div class="stash-panel">
