@@ -3,795 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
     <title>Relic Loadout Editor</title>
-    <style>
-        :root {
-            /* Theme matching index.html (GitHub Dark Dimmed style) */
-            --bg-color: #0d1117;
-            --panel-bg: #161b22;
-            --border-color: #30363d;
-            --text-color: #c9d1d9;
-            --text-muted: #8b949e;
-            --accent-color: #58a6ff;
-            --input-bg: #0d1117;
-            
-            --grid-cell-size: 60px;
-            --slot-bg: #21262d;
-            --slot-blocked: #010409;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-            line-height: 1.5;
-        }
-
-        /* Layout */
-        .header {
-            padding: 15px 20px;
-            background-color: var(--panel-bg);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .header h3 {
-            margin: 0;
-            color: var(--accent-color);
-            font-size: 1.2rem;
-        }
-
-        .main-content {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            gap: 0;
-        }
-
-        .stash-panel {
-            width: fit-content;
-            min-width: 260px;
-            flex: 0 0 auto;
-            background-color: var(--panel-bg);
-            border-right: 1px solid var(--border-color);
-            padding: 20px;
-            
-            /* Layout Fixes */
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            z-index: 5;
-            height: 100%;           /* Force full height */
-            overflow: hidden;       /* Stop the panel itself from scrolling */
-            box-sizing: border-box; /* Ensure padding doesn't add to height */
-        }
-
-        .stash-grid {
-            display: grid;
-            grid-template-columns: repeat(4, var(--stash-cell-size));
-            grid-auto-rows: var(--stash-cell-size);
-            gap: 4px;
-            background-color: var(--bg-color);
-            padding: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            
-            /* Layout Fixes */
-            flex: 1;              /* Grow to fill available space */
-            min-height: 0;        /* Allow shrinking if needed */
-            overflow: auto;       /* Enable internal scrolling */
-            align-content: start;
-            position: relative;
-        }
-
-        .sidebar {
-            width: 240px;
-            background-color: var(--panel-bg);
-            border-right: 1px solid var(--border-color);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            overflow-y: auto;
-        }
-
-        .sidebar-section {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .sidebar-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 600;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        kbd {
-            background-color: #21262d;
-            border: 1px solid #6e7681;
-            border-bottom-color: #484f58;
-            border-radius: 4px;
-            box-shadow: inset 0 -1px 0 #484f58;
-            color: var(--text-color);
-            display: inline-block;
-            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-            font-size: 0.75em;
-            line-height: 1;
-            padding: 3px 6px;
-            vertical-align: middle;
-        }
-
-        .shortcut-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85em;
-            color: var(--text-muted);
-            padding: 4px 0;
-        }
-
-        .editor-area {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #010409; /* Darker background for canvas */
-            position: relative;
-            overflow: auto;
-            background-image: radial-gradient(#21262d 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-
-        .properties-panel {
-            width: 420px;
-            background-color: var(--panel-bg);
-            border-left: 1px solid var(--border-color);
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        h4 {
-            margin-top: 0;
-            margin-bottom: 12px;
-            color: var(--text-color);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-        }
-
-        hr {
-            border: 0;
-            border-top: 1px solid var(--border-color);
-            margin: 15px 0;
-        }
-
-        /* Inputs & Status */
-        input[type="file"] {
-            display: none;
-        }
-
-        .file-upload-btn {
-            background-color: #1f6feb; /* Primary Blue */
-            color: white;
-            border: 1px solid rgba(240,246,252,0.1);
-            font-weight: 500;
-            padding: 8px 12px;
-            text-align: center;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .file-upload-btn:hover {
-            background-color: #388bfd;
-            border-color: transparent;
-        }
-        
-        .file-upload-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            color: var(--text-muted);
-        }
-
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.85em;
-            padding: 6px 0;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-muted);
-        }
-
-        .status-pending { color: #d29922; } /* GitHub Warning Color */
-        .status-ok { color: #3fb950; }     /* GitHub Success Color */
-        .status-error { color: #f85149; }  /* GitHub Error Color */
-
-        /* Grid Visualization */
-        .inventory-grid {
-            display: grid;
-            grid-template-columns: repeat(7, var(--grid-cell-size));
-            grid-template-rows: repeat(6, var(--grid-cell-size));
-            gap: 4px;
-            position: relative;
-            background-color: var(--bg-color);
-            padding: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        .grid-slot {
-            width: var(--grid-cell-size);
-            height: var(--grid-cell-size);
-            background-color: var(--slot-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-        }
-
-        .grid-slot.blocked {
-            background-color: var(--slot-blocked);
-            border-color: #111;
-            background-image: repeating-linear-gradient(45deg, var(--slot-blocked) 0, var(--slot-blocked) 10px, #161b22 10px, #161b22 20px);
-        }
-
-        .relic-item {
-            position: absolute;
-            background-color: rgba(22, 27, 34, 0.95);
-            border: 2px solid var(--text-muted);
-            box-sizing: border-box;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 0.75em;
-            text-align: center;
-            transition: all 0.2s;
-            overflow: hidden;
-            z-index: 10;
-            padding: 2px;
-            word-break: break-word;
-            border-radius: 4px;
-            color: var(--text-color);
-        }
-
-        .relic-item:hover {
-            border-color: var(--text-color);
-            z-index: 20;
-            transform: translateY(-2px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-        }
-
-        .relic-item.selected {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.4);
-            z-index: 30;
-        }
-
-        /* Rarity Colors (Adjusted for Dark Mode) */
-        .rarity-0 { border-color: #8b949e; background: #21262d; } 
-        .rarity-1 { border-color: #58a6ff; background: #0d1117; } 
-        .rarity-2 { border-color: #d29922; background: #251e08; } 
-        .rarity-3 { border-color: #f85149; background: #280d0d; } 
-
-        /* Form Elements */
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.85em;
-            color: var(--text-muted);
-        }
-
-        input[type="text"], input[type="number"], select {
-            width: 100%;
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            padding: 6px 10px;
-            box-sizing: border-box;
-            border-radius: 6px;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 1px var(--accent-color);
-        }
-
-        /* Remove spinner arrows from number inputs */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
-        }
-
-        input[type=number] {
-            -moz-appearance: textfield; /* Firefox */
-        }
-
-        button {
-            background-color: #238636; /* GitHub Green */
-            color: white;
-            border: 1px solid rgba(240,246,252,0.1);
-            padding: 6px 16px;
-            cursor: pointer;
-            font-weight: 500;
-            border-radius: 6px;
-            transition: 0.2s;
-        }
-
-        button:hover { background-color: #2ea043; }
-        button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed; border-color: var(--border-color); }
-
-        /* Affix Styling */
-        .affix-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .affix-item {
-            background: var(--bg-color);
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            position: relative;
-        }
-
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 24px;
-            background: transparent;
-            cursor: pointer;
-            margin: 0;
-        }
-
-        input[type=range]:focus { outline: none; }
-
-        /* --- Chrome / Edge / Safari (The Gradient Trick) --- */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            border: 1px solid #30363d;
-            
-            /* We use a CSS variable (--range-percent) to tell the gradient where to stop.
-               Blue on the left, Dark on the right.
-            */
-            background: linear-gradient(to right, 
-                var(--accent-color) 0%, 
-                var(--accent-color) var(--range-percent, 0%), 
-                #0d1117 var(--range-percent, 0%), 
-                #0d1117 100%
-            );
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
-            border-radius: 50%;
-            background: #c9d1d9;
-            border: 2px solid #21262d;
-            margin-top: -6px; /* Center thumb on 6px track */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            transition: transform 0.1s;
-        }
-
-        input[type=range]:hover::-webkit-slider-thumb {
-            background: var(--accent-color);
-            transform: scale(1.1);
-            border-color: #fff;
-        }
-
-        /* --- Firefox (Native Support) --- */
-        input[type=range]::-moz-range-track {
-            width: 100%;
-            height: 6px;
-            background: #0d1117; /* Empty part */
-            border: 1px solid #30363d;
-            border-radius: 3px;
-        }
-
-        input[type=range]::-moz-range-progress {
-            background-color: var(--accent-color); /* Filled part */
-            height: 6px;
-            border-radius: 3px;
-        }
-
-        input[type=range]::-moz-range-thumb {
-            height: 16px;
-            width: 16px;
-            border: 2px solid #21262d;
-            border-radius: 50%;
-            background: #c9d1d9;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        input[type=range]:hover::-moz-range-thumb {
-            background: var(--accent-color);
-            transform: scale(1.1);
-            border-color: #fff;
-        }
-
-        .calculated-value {
-            font-size: 0.9em;
-            color: #3fb950; /* Green */
-            font-weight: bold;
-            margin-bottom: 5px;
-            display: block;
-        }
-
-        .range-info {
-            font-size: 0.75em;
-            color: var(--text-muted);
-            float: right;
-            background: rgba(110, 118, 129, 0.1);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        
-        .multiplier-tag {
-            background: rgba(56, 139, 253, 0.15);
-            color: #58a6ff;
-            padding: 1px 6px;
-            border-radius: 10px;
-            font-size: 0.75em;
-            margin-left: 5px;
-            border: 1px solid rgba(56, 139, 253, 0.4);
-        }
-
-        .btn-download {
-            background-color: #238636;
-        }
-
-        .btn-add {
-            background-color: #1f6feb; /* GitHub Blue for primary actions */
-            width: 100%;
-            margin-top: 10px;
-            padding: 8px;
-            font-size: 0.9em;
-        }
-        .btn-add:hover { background-color: #388bfd; }
-
-        .btn-remove {
-            background-color: transparent;
-            color: #f85149;
-            border: 1px solid rgba(248, 81, 73, 0.4);
-            padding: 4px 10px;
-            font-size: 0.8em;
-            border-radius: 6px;
-        }
-        .btn-remove:hover { 
-            background-color: rgba(248, 81, 73, 0.1);
-            border-color: #f85149;
-        }
-
-        .affix-footer {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid var(--border-color);
-        }
-
-        /* Modal Styles */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(2px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            display: none;
-        }
-
-        .modal-content {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            width: 500px;
-            max-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            padding: 24px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            border-radius: 8px;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-search {
-            width: 100%;
-            padding: 8px 12px;
-            background: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            margin-bottom: 15px;
-            border-radius: 6px;
-            font-size: 1rem;
-        }
-
-        .affix-search-list {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            background: var(--bg-color);
-            border-radius: 6px;
-        }
-
-        .search-item {
-            padding: 10px 15px;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-
-        .search-item:last-child { border-bottom: none; }
-
-        .search-item:hover {
-            background: #21262d;
-        }
-
-        .search-item strong {
-            display: block;
-            color: var(--text-color);
-        }
-
-        .search-item small {
-            color: var(--text-muted);
-        }
-
-        .btn-close {
-            background-color: transparent !important; /* Force override of global green */
-            border: none !important;                  /* Remove global button border */
-            color: var(--text-muted);
-            font-size: 1.5em;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-        }
-
-        .btn-close:hover {
-            background-color: rgba(255, 255, 255, 0.1) !important; /* Slight tint instead of green */
-            color: var(--text-color);
-            box-shadow: none !important; /* Remove any global button shadows */
-            border-color: transparent !important;
-        }
-        
-        .btn-select-affix {
-            background: var(--bg-color);
-            color: var(--text-color);
-            width: 100%;
-            text-align: left;
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: border-color 0.2s;
-        }
-        .btn-select-affix:hover {
-            border-color: var(--accent-color);
-        }
-
-        .relic-item.dragging {
-            opacity: 0.9;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-            z-index: 100 !important;
-            cursor: grabbing;
-            transition: none; /* Disable transition for instant follow response */
-            pointer-events: none; /* Important for mouse tracking */
-        }
-
-        /* Ensure the container catches mouse events when item has pointer-events: none */
-        .inventory-grid {
-            user-select: none; /* Prevent text selection while dragging */
-        }
-
-        .trash-zone {
-            flex-shrink: 0;       /* Prevent being squashed */
-            border: 2px solid #f85149;
-            color: #f85149;
-            border-radius: 6px;
-            padding: 20px;       
-            text-align: center;
-            font-weight: bold;
-            cursor: default;
-            transition: all 0.2s;
-            background-color: rgba(40, 13, 13, 0.70);
-            z-index: 20;          /* Ensure it stays above any weird overlaps */
-        }
-
-        .trash-zone.drag-over {
-            background-color: rgba(248, 81, 73, 0.2);
-            transform: scale(1.02);
-            box-shadow: 0 0 15px rgba(248, 81, 73, 0.3);
-        }
-
-        /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-track { background: var(--bg-color); border-left: 1px solid var(--border-color); }
-        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 5px; border: 2px solid var(--bg-color); }
-        ::-webkit-scrollbar-thumb:hover { background: #565e68; }
-
-        .search-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-
-        .search-item-left {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .search-item-right {
-            text-align: right;
-            font-family: monospace;
-            color: var(--text-muted);
-            font-size: 0.85em;
-
-            white-space: nowrap; /* Forces text to stay on one line */
-            flex-shrink: 0;      /* Prevents the ID box from getting squished by long names */
-            margin-left: 15px;   /* Adds a safety buffer between the name and the ID */
-        }
-
-        .tag-container {
-            display: flex;
-            gap: 6px;
-        }
-
-        .tag-badge {
-            font-size: 0.7em;
-            padding: 1px 6px;
-            border-radius: 4px;
-            border: 1px solid;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        /* Badge Colors */
-        .tag-unique { color: #f85149; border-color: rgba(248, 81, 73, 0.4); background: rgba(248, 81, 73, 0.1); }
-        .tag-rare { color: #d29922; border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.1); }
-        .tag-corrupted { color: #a371f7; border-color: rgba(163, 113, 247, 0.4); background: rgba(163, 113, 247, 0.1); }
-        .tag-fury { color: #e5534b; border-color: rgba(229, 83, 75, 0.4); background: rgba(229, 83, 75, 0.1); }
-        .tag-faith { color: #58a6ff; border-color: rgba(88, 166, 255, 0.4); background: rgba(88, 166, 255, 0.1); }
-        .tag-discipline { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.1); }
-
-        /* --- Splash Overlay Styling --- */
-        .upload-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(13, 17, 23, 0.85); /* Dark dim */
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-
-        .upload-prompt-card {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 40px;
-            width: 100%;
-            max-width: 500px;
-            text-align: center;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-
-        .upload-prompt-card h2 {
-            margin: 0;
-            color: var(--text-color);
-            font-weight: 600;
-        }
-
-        .upload-subtitle {
-            margin: 0;
-            color: var(--text-muted);
-            font-size: 1rem;
-            line-height: 1.5;
-        }
-
-        .path-label {
-            display: block;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-weight: 700;
-            color: var(--accent-color); /* Blue label */
-            margin-bottom: 8px;
-        }
-
-        .path-code {
-            display: block;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-            font-size: 0.85rem;
-            color: var(--text-color);
-            background: rgba(110, 118, 129, 0.1);
-            padding: 10px;
-            border-radius: 4px;
-            word-break: break-all; /* Wrap long paths */
-            user-select: all;      /* Select text on single click */
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .btn-large {
-            background-color: #238636;
-            color: white;
-            font-size: 1rem;
-            font-weight: 600;
-            padding: 12px 24px;
-            border-radius: 6px;
-            border: 1px solid rgba(240,246,252,0.1);
-            cursor: pointer;
-            transition: background 0.2s;
-            width: 100%;
-        }
-
-        .btn-large:hover {
-            background-color: #2ea043;
-        }
-    </style>
 </head>
 <body>
 
@@ -2078,84 +1291,134 @@ class RelicEditor {
 
     renderAffixList(container, affixes, title, tier, level, isUnlocked) {
         if (!affixes) return;
-        
-        container.appendChild(document.createElement('hr'));
-        container.appendChild(Object.assign(document.createElement('h4'), {textContent: title}));
+
+        // Header Section
+        const headerRow = document.createElement('div');
+        headerRow.style.display = 'flex';
+        headerRow.style.justifyContent = 'space-between';
+        headerRow.style.alignItems = 'center';
+        headerRow.style.marginTop = '20px';
+        headerRow.style.marginBottom = '10px';
+        headerRow.style.borderBottom = '1px solid var(--border-color)';
+        headerRow.style.paddingBottom = '6px';
+
+        const h4 = document.createElement('h4');
+        h4.textContent = title;
+        h4.style.border = 'none';
+        h4.style.margin = '0';
+        h4.style.fontSize = '0.9rem';
+        h4.style.color = 'var(--text-muted)';
+        h4.style.textTransform = 'uppercase';
+        h4.style.letterSpacing = '0.05em';
+
+        const btnAdd = document.createElement('button');
+        btnAdd.className = 'btn-add'; 
+        btnAdd.style.width = 'auto';
+        btnAdd.style.padding = '4px 10px';
+        btnAdd.style.fontSize = '0.8em';
+        btnAdd.style.marginTop = '0'; 
+        btnAdd.textContent = '+ Add Affix';
+        btnAdd.onclick = () => this.addAffix(false);
+
+        headerRow.appendChild(h4);
+        headerRow.appendChild(btnAdd);
+        container.appendChild(headerRow);
 
         const list = document.createElement('div');
         list.className = 'affix-list';
 
         affixes.forEach((affix, idx) => {
+            const def = this.definitions.affixes[affix._relicAffixDefinitionId];
+            const range = this.getAffixRange(affix._relicAffixDefinitionId, tier);
+
             const div = document.createElement('div');
             div.className = 'affix-item';
-            
-            // Lookup Definition
-            const def = this.definitions.affixes[affix._relicAffixDefinitionId];
-            
-            // Name Label
-            const nameLabel = document.createElement('label');
-            nameLabel.style.color = '#fff';
-            nameLabel.innerHTML = this.getAffixName(affix._relicAffixDefinitionId);
 
-            // Rarity tag
-            if (def) {
-                if (def.eAffixRarity === 'Unique') {
-                    nameLabel.innerHTML += ` <span style="font-size:0.7em; border:1px solid #f85149; color:#f85149; padding:0 4px; border-radius:4px; margin-left:4px; vertical-align:middle;">UNIQUE</span>`;
-                } else if (def.eAffixRarity === 'Special') {
-                    nameLabel.innerHTML += ` <span style="font-size:0.7em; border:1px solid #d29922; color:#d29922; padding:0 4px; border-radius:4px; margin-left:4px; vertical-align:middle;">SPECIAL</span>`;
-                }
+            // --- Row 1: Header ---
+            const header = document.createElement('div');
+            header.className = 'affix-header';
+
+            // Left: Name -> (Range + Tags)
+            const nameGroup = document.createElement('div');
+            nameGroup.className = 'affix-name-group';
+
+            const nameBtn = document.createElement('button');
+            nameBtn.className = 'affix-name-btn';
+            nameBtn.textContent = this.getAffixName(affix._relicAffixDefinitionId);
+            nameBtn.title = "Click to change affix";
+            nameBtn.onclick = () => {
+                this.openAffixModal(affix._relicAffixDefinitionId, (newId) => {
+                    affix._relicAffixDefinitionId = parseInt(newId);
+                    this.renderInspector();
+                });
+            };
+
+            const metaRow = document.createElement('div');
+            metaRow.className = 'affix-meta-row';
+
+            // 1. Range (First in meta row)
+            if (range) {
+                const rangeInfo = document.createElement('span');
+                rangeInfo.className = 'range-info-card';
+                rangeInfo.textContent = `[${range[0]} - ${range[1]}]`;
+                metaRow.appendChild(rangeInfo);
             }
-            
-            // Multiplier and overide Tag
+
+            // 2. Tags (Second in meta row)
+            const tagsDiv = document.createElement('div');
+            tagsDiv.className = 'affix-tags';
+
             const overrideConfig = this.getAdditiveOverrideConfig(def);
-            
             if (overrideConfig) {
-                // If Override exists: Show Additive Tag (e.g., +15)
                 const val = parseFloat(overrideConfig[level] || 0);
                 if (val !== 0) {
-                     // Check if positive to add '+', otherwise negative numbers include '-' automatically
-                     const displayVal = val >= 0 ? `+${val}` : val;
-                     nameLabel.innerHTML += ` <span class="multiplier-tag" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">${displayVal}</span>`;
+                    const displayVal = val >= 0 ? `+${val}` : val;
+                    tagsDiv.innerHTML += `<span class="tag-mini" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">${displayVal}</span>`;
                 }
             } else {
-                // If No Override: Show Multiplier Tag (e.g., x1.5)
                 const mult = this.getUpgradeMultiplier(level, def);
-                if(mult > 1.0) {
-                     nameLabel.innerHTML += ` <span class="multiplier-tag">x${mult}</span>`;
+                if (mult > 1.0) tagsDiv.innerHTML += `<span class="tag-mini" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">x${mult}</span>`;
+            }
+
+            if (def) {
+                if (def.eAffixRarity === 'Unique') {
+                    tagsDiv.innerHTML += `<span class="tag-mini" style="color:#f85149; border-color:#f85149;">Unique</span>`;
+                } else if (def.eAffixRarity === 'Special') {
+                    tagsDiv.innerHTML += `<span class="tag-mini" style="color:#d29922; border-color:#d29922;">Rare</span>`;
                 }
             }
-            div.appendChild(nameLabel);
+            
+            metaRow.appendChild(tagsDiv);
 
-            // Range & Value
-            const range = this.getAffixRange(affix._relicAffixDefinitionId, tier);
-            if (range) {
-                const realVal = document.createElement('span');
-                realVal.className = 'calculated-value';
-                realVal.textContent = this.calculateRealValue(affix._rollValue, range, level, def);
-                div.appendChild(realVal);
+            nameGroup.appendChild(nameBtn);
+            nameGroup.appendChild(metaRow);
 
-                const rangeInfo = document.createElement('span');
-                rangeInfo.className = 'range-info';
-                rangeInfo.textContent = `T${tier} Range: [${range[0]} - ${range[1]}]`;
-                div.insertBefore(rangeInfo, nameLabel);
-            }
+            // Right: Value & Lock
+            const rightGroup = document.createElement('div');
+            rightGroup.className = 'affix-right-group';
 
-            // Dropdown
-            div.appendChild(this.createAffixSelect('Affix Name', affix._relicAffixDefinitionId, (v) => {
-                affix._relicAffixDefinitionId = parseInt(v);
-                this.renderInspector();
-            }));
+            const calcVal = document.createElement('span');
+            calcVal.className = 'calculated-value-card';
+            calcVal.textContent = this.calculateRealValue(affix._rollValue, range, level, def);
 
-            // --- FIX: Slider Range Logic ---
-            // Decoupled from item._ascended. Uses UI-only 'isUnlocked' flag.
+            // Lock (Moved here)
+            const lockLabel = document.createElement('label');
+            lockLabel.className = 'lock-label';
+            lockLabel.innerHTML = `<input type="checkbox" ${affix._locked ? 'checked' : ''}> Lock`;
+            lockLabel.querySelector('input').onchange = (e) => this.updateAffixLock(idx, e.target.checked, false);
+
+            rightGroup.appendChild(calcVal);
+            rightGroup.appendChild(lockLabel);
+
+            header.appendChild(nameGroup);
+            header.appendChild(rightGroup);
+            div.appendChild(header);
+
+            // --- Row 2: Controls ---
+            const controls = document.createElement('div');
+            controls.className = 'affix-controls';
+
             const maxVal = Math.max(1.0, affix._rollValue, isUnlocked ? 1.2 : 1.0);
-            
-            const sliderGroup = document.createElement('div');
-            sliderGroup.className = 'form-group';
-            sliderGroup.innerHTML = `<label>Roll Coefficient (0.0 - ${maxVal.toFixed(1)})</label>`;
-            
-            const sliderContainer = document.createElement('div');
-            sliderContainer.className = 'slider-container';
 
             const slider = document.createElement('input');
             slider.type = 'range';
@@ -2163,68 +1426,46 @@ class RelicEditor {
             slider.max = maxVal;
             slider.step = 0.001;
             slider.value = affix._rollValue;
+            setTimeout(() => this.updateSliderFill(slider), 0);
 
             const numInput = document.createElement('input');
             numInput.type = 'number';
+            numInput.className = 'input-standard';
             numInput.step = 0.001;
             numInput.value = affix._rollValue.toFixed(3);
-            numInput.style.width = '80px';
 
+            // Events
             slider.oninput = (e) => {
                 const val = parseFloat(e.target.value);
                 affix._rollValue = val;
                 numInput.value = val.toFixed(3);
                 this.updateSliderFill(e.target);
-                if (range) {
-                    div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
-                }
+                if (range) calcVal.textContent = this.calculateRealValue(val, range, level, def);
             };
+
             numInput.onchange = (e) => {
                 let val = parseFloat(e.target.value);
-                // Clamp to the dynamic maxVal we calculated above
-                if (val > maxVal) val = maxVal; 
+                if (val > maxVal) val = maxVal;
                 affix._rollValue = val;
                 e.target.value = val.toFixed(3);
                 slider.value = val;
-                this.renderInspector(); 
+                this.updateSliderFill(slider);
+                if (range) calcVal.textContent = this.calculateRealValue(val, range, level, def);
             };
 
-            sliderContainer.appendChild(slider);
-            sliderContainer.appendChild(numInput);
-            sliderGroup.appendChild(sliderContainer);
-            div.appendChild(sliderGroup);
-
-            // Locked Checkbox
-            const lockCheck = document.createElement('div');
-            lockCheck.innerHTML = `
-                <label style="display:inline-flex; align-items:center; gap:5px;">
-                    <input type="checkbox" ${affix._locked ? 'checked' : ''} 
-                    onchange="app.updateAffixLock(${idx}, this.checked, false)"> Locked
-                </label>
-            `;
-            div.appendChild(lockCheck);
-
-            // Footer
-            const footer = document.createElement('div');
-            footer.className = 'affix-footer';
-            
+            // Remove Button (Moved here)
             const btnRemove = document.createElement('button');
-            btnRemove.className = 'btn-remove';
+            btnRemove.className = 'btn-remove-danger';
             btnRemove.textContent = 'Remove';
             btnRemove.onclick = () => this.removeAffix(idx, false);
-            
-            footer.appendChild(btnRemove);
-            div.appendChild(footer);
 
+            controls.appendChild(slider);
+            controls.appendChild(numInput);
+            controls.appendChild(btnRemove);
+
+            div.appendChild(controls);
             list.appendChild(div);
         });
-
-        // Add Button
-        const btnAdd = document.createElement('button');
-        btnAdd.className = 'btn-add';
-        btnAdd.textContent = '+ Add Affix';
-        btnAdd.onclick = () => this.addAffix(false);
-        list.appendChild(btnAdd);
 
         container.appendChild(list);
     }
@@ -2232,28 +1473,51 @@ class RelicEditor {
     renderImplicitAffixList(container, implicitData, title, tier, level, isUnlocked) {
         if (!implicitData) implicitData = [];
 
-        container.appendChild(document.createElement('hr'));
-        container.appendChild(Object.assign(document.createElement('h4'), {
-            textContent: `${title} (${implicitData.length})`
-        }));
-        
+        // Header Section
+        const headerRow = document.createElement('div');
+        headerRow.style.display = 'flex';
+        headerRow.style.justifyContent = 'space-between';
+        headerRow.style.alignItems = 'center';
+        headerRow.style.marginTop = '20px';
+        headerRow.style.marginBottom = '10px';
+        headerRow.style.borderBottom = '1px solid var(--border-color)';
+        headerRow.style.paddingBottom = '6px';
+
+        const h4 = document.createElement('h4');
+        h4.textContent = title;
+        h4.style.border = 'none';
+        h4.style.margin = '0';
+        h4.style.fontSize = '0.9rem';
+        h4.style.color = 'var(--text-muted)';
+        h4.style.textTransform = 'uppercase';
+        h4.style.letterSpacing = '0.05em';
+
+        const btnAdd = document.createElement('button');
+        btnAdd.className = 'btn-add';
+        btnAdd.style.width = 'auto';
+        btnAdd.style.padding = '4px 10px';
+        btnAdd.style.fontSize = '0.8em';
+        btnAdd.style.marginTop = '0';
+        btnAdd.textContent = '+ Add Implicit';
+        btnAdd.onclick = () => this.addAffix(true);
+
+        headerRow.appendChild(h4);
+        headerRow.appendChild(btnAdd);
+        container.appendChild(headerRow);
+
         const list = document.createElement('div');
         list.className = 'affix-list';
 
         const mapping = this.data.implicit_mapping;
 
         implicitData.forEach((impObj, idx) => {
-            // --- LIMIT WARNING ---
             if (idx === 3) {
                 const limitWarning = document.createElement('div');
-                limitWarning.style.color = '#d29922'; 
+                limitWarning.style.color = '#d29922';
                 limitWarning.style.textAlign = 'center';
                 limitWarning.style.fontSize = '0.75em';
-                limitWarning.style.fontWeight = 'bold';
-                limitWarning.style.margin = '15px 0 5px 0';
-                limitWarning.style.borderTop = '1px dashed #d29922';
-                limitWarning.style.paddingTop = '5px';
-                limitWarning.innerHTML = '⚠ GAME DISPLAY LIMIT (TOP 3 SHOWN) ⚠';
+                limitWarning.style.padding = '8px';
+                limitWarning.innerHTML = '--- GAME DISPLAY LIMIT (TOP 3 SHOWN) ---';
                 list.appendChild(limitWarning);
             }
 
@@ -2261,39 +1525,22 @@ class RelicEditor {
             const defId = affix._relicAffixDefinitionId;
             const def = this.definitions.affixes[defId];
 
-            // --- 1. AUTO-DETECT LOGIC (UPDATED) ---
             const range = this.getAffixRange(defId, tier);
             const mapId = mapping ? mapping[defId] : undefined;
-            
-            // Check properties
-            const isSpecificType = mapId !== undefined && mapId !== 3; // 0=Fury, 1=Faith, 2=Discipline
+            const isSpecificType = mapId !== undefined && mapId !== 3;
             const isUnique = def && def.eAffixRarity === 'Unique';
             const isSpecial = def && def.eAffixRarity === 'Special';
             const isFixedRange = range && range[0] === range[1];
 
-            // Calculate correct category based on priority:
-            // 1. Specific Type (Fury/Faith/Discipline)
-            // 2. Corrupted (Fixed Range AND NOT Unique AND NOT Special)
-            // 3. Mapped Default (if any)
-            // 4. None (-1)
+            // Auto-calculate Category logic
             let calculatedCat = -1;
-            if (isSpecificType) {
-                calculatedCat = mapId;
-            } else if (isFixedRange && !isUnique && !isSpecial) {
-                calculatedCat = 3; 
-            } else if (mapId !== undefined) {
-                calculatedCat = mapId;
-            }
+            if (isSpecificType) calculatedCat = mapId;
+            else if (isFixedRange && !isUnique && !isSpecial) calculatedCat = 3;
+            else if (mapId !== undefined) calculatedCat = mapId;
 
-            // Apply Logic:
-            // Initialize if undefined OR Correct if it was wrongly flagged as Corrupted (3) but is actually Specific (0,1,2)
             if (impObj._eImplicitAffixCategory === undefined || impObj._eImplicitAffixCategory === null || (impObj._eImplicitAffixCategory === 3 && isSpecificType)) {
                 impObj._eImplicitAffixCategory = calculatedCat;
             }
-            
-            // --- 2. RENDER VISUALS ---
-            const div = document.createElement('div');
-            div.className = 'affix-item';
 
             const catColors = {
                 0: '#e5534b', // Fury
@@ -2302,132 +1549,114 @@ class RelicEditor {
                 3: '#a371f7', // Corrupted
                 [-1]: '#888888' // None
             };
-
             const currentCat = impObj._eImplicitAffixCategory;
             const currentColor = catColors[currentCat] || '#888888';
-            
-            div.style.borderColor = currentColor;
-            div.style.borderLeftWidth = '5px'; 
-            if (idx >= 3) div.style.opacity = '0.6'; 
 
-            // 3. TYPE HEADER
-            const catHeader = document.createElement('div');
-            catHeader.style.marginBottom = '8px';
-            catHeader.style.display = 'flex';
-            catHeader.style.alignItems = 'center';
-            
+            const div = document.createElement('div');
+            div.className = 'affix-item';
+            div.style.borderLeft = `3px solid ${currentColor}`;
+            if (idx >= 3) div.style.opacity = '0.6';
+
+            // --- Row 1: Header ---
+            const header = document.createElement('div');
+            header.className = 'affix-header';
+
+            // Left: Name & Category -> Meta Row (Range + Tags)
+            const nameGroup = document.createElement('div');
+            nameGroup.className = 'affix-name-group';
+
+            const topRowName = document.createElement('div');
+            topRowName.style.display = 'flex';
+            topRowName.style.alignItems = 'center';
+            topRowName.style.gap = '8px';
+
             const catLabel = document.createElement('span');
-            catLabel.style.fontSize = '0.7em';
-            catLabel.style.color = '#888';
-            catLabel.style.marginRight = '6px';
-            catLabel.textContent = "TYPE:";
+            catLabel.textContent = this.getImplicitCategoryName(currentCat);
+            catLabel.style.color = currentColor;
+            catLabel.style.fontSize = '0.75rem';
+            catLabel.style.fontWeight = '700';
+            catLabel.style.textTransform = 'uppercase';
+            catLabel.style.letterSpacing = '0.05em';
             
-            const catSelect = document.createElement('select');
-            catSelect.style.backgroundColor = 'transparent';
-            catSelect.style.color = currentColor;
-            catSelect.style.border = 'none';
-            catSelect.style.fontSize = '0.75em';
-            catSelect.style.fontWeight = 'bold';
-            catSelect.style.textTransform = 'uppercase';
-            catSelect.style.cursor = 'pointer';
-            catSelect.style.outline = 'none';
-            
-            [-1, 0, 1, 2, 3].forEach(id => {
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = this.getImplicitCategoryName(id);
-                opt.style.backgroundColor = '#161b22';
-                opt.style.color = catColors[id] || '#888';
-                if (currentCat === id) opt.selected = true;
-                catSelect.appendChild(opt);
-            });
+            const nameBtn = document.createElement('button');
+            nameBtn.className = 'affix-name-btn';
+            nameBtn.textContent = this.getAffixName(defId);
+            nameBtn.onclick = () => {
+                this.openAffixModal(defId, (newId) => {
+                    const parsedId = parseInt(newId);
+                    affix._relicAffixDefinitionId = parsedId;
+                    
+                    const newDef = this.definitions.affixes[parsedId];
+                    const newMapId = mapping ? mapping[parsedId] : undefined;
+                    const newRange = this.getAffixRange(parsedId, tier);
+                    const nSpec = newMapId !== undefined && newMapId !== 3;
+                    const nUnq = newDef && newDef.eAffixRarity === 'Unique';
+                    const nRare = newDef && newDef.eAffixRarity === 'Special';
+                    const nFixed = newRange && newRange[0] === newRange[1];
 
-            catSelect.onchange = (e) => {
-                impObj._eImplicitAffixCategory = parseInt(e.target.value);
-                this.renderInspector(); 
+                    if (nSpec) impObj._eImplicitAffixCategory = newMapId;
+                    else if (nFixed && !nUnq && !nRare) impObj._eImplicitAffixCategory = 3;
+                    else if (newMapId !== undefined) impObj._eImplicitAffixCategory = newMapId;
+                    else impObj._eImplicitAffixCategory = -1;
+
+                    this.renderInspector();
+                });
             };
 
-            catHeader.appendChild(catLabel);
-            catHeader.appendChild(catSelect);
-            div.appendChild(catHeader);
+            topRowName.appendChild(catLabel);
+            topRowName.appendChild(nameBtn);
+            nameGroup.appendChild(topRowName);
 
-            // 4. Name Label
-            const nameLabel = document.createElement('label');
-            nameLabel.style.color = '#add8e6';
-            nameLabel.innerHTML = this.getAffixName(defId);
+            // Meta Row for Implicit (Range + Tags)
+            const metaRow = document.createElement('div');
+            metaRow.className = 'affix-meta-row';
 
-            if (def) {
-                if (def.eAffixRarity === 'Unique') {
-                    nameLabel.innerHTML += ` <span style="font-size:0.7em; border:1px solid #f85149; color:#f85149; padding:0 4px; border-radius:4px; margin-left:4px; vertical-align:middle;">UNIQUE</span>`;
-                } else if (def.eAffixRarity === 'Special') {
-                    nameLabel.innerHTML += ` <span style="font-size:0.7em; border:1px solid #d29922; color:#d29922; padding:0 4px; border-radius:4px; margin-left:4px; vertical-align:middle;">RARE</span>`;
-                }
+            // 1. Range
+            if (range) {
+                const rangeInfo = document.createElement('span');
+                rangeInfo.className = 'range-info-card';
+                rangeInfo.textContent = `[${range[0]} - ${range[1]}]`;
+                metaRow.appendChild(rangeInfo);
             }
-            
+
+            // 2. Tags (Multiplier / Override)
+            const tagsDiv = document.createElement('div');
+            tagsDiv.className = 'affix-tags';
+
             const overrideConfig = this.getAdditiveOverrideConfig(def);
             if (overrideConfig) {
                 const val = parseFloat(overrideConfig[level] || 0);
                 if (val !== 0) {
                     const displayVal = val >= 0 ? `+${val}` : val;
-                    nameLabel.innerHTML += ` <span class="multiplier-tag" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">+${displayVal}</span>`;
+                    tagsDiv.innerHTML += `<span class="tag-mini" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">${displayVal}</span>`;
                 }
             } else {
                 const mult = this.getUpgradeMultiplier(level, def);
-                if(mult > 1.0) nameLabel.innerHTML += ` <span class="multiplier-tag">x${mult}</span>`;
+                if (mult > 1.0) tagsDiv.innerHTML += `<span class="tag-mini" style="color:#79c0ff; border-color:rgba(121, 192, 255, 0.4);">x${mult}</span>`;
             }
-            div.appendChild(nameLabel);
+            metaRow.appendChild(tagsDiv);
 
-            // 5. Range Display
-            if (range) {
-                const realVal = document.createElement('span');
-                realVal.className = 'calculated-value';
-                realVal.textContent = this.calculateRealValue(affix._rollValue, range, level, def);
-                div.appendChild(realVal);
+            nameGroup.appendChild(metaRow);
 
-                const rangeInfo = document.createElement('span');
-                rangeInfo.className = 'range-info';
-                rangeInfo.textContent = `T${tier} Range: [${range[0]} - ${range[1]}]`;
-                div.insertBefore(rangeInfo, nameLabel);
-            }
+            // Right: Value Only (Lock removed)
+            const rightGroup = document.createElement('div');
+            rightGroup.className = 'affix-right-group';
 
-            // 6. Affix Selector (UPDATED CALLBACK LOGIC)
-            const affixSelectWrapper = this.createAffixSelect('Affix Name', defId, (v) => {
-                const newId = parseInt(v);
-                affix._relicAffixDefinitionId = newId;
+            const calcVal = document.createElement('span');
+            calcVal.className = 'calculated-value-card';
+            calcVal.textContent = this.calculateRealValue(affix._rollValue, range, level, def);
 
-                // Re-calculate category for the new ID
-                const newDef = this.definitions.affixes[newId];
-                const newMapId = mapping ? mapping[newId] : undefined;
-                const newRange = this.getAffixRange(newId, tier);
-                
-                const newIsSpecific = newMapId !== undefined && newMapId !== 3;
-                const newIsUnique = newDef && newDef.eAffixRarity === 'Unique';
-                const newIsSpecial = newDef && newDef.eAffixRarity === 'Special';
-                const newIsFixed = newRange && newRange[0] === newRange[1];
+            rightGroup.appendChild(calcVal);
 
-                if (newIsSpecific) {
-                    impObj._eImplicitAffixCategory = newMapId;
-                } else if (newIsFixed && !newIsUnique && !newIsSpecial) {
-                    impObj._eImplicitAffixCategory = 3; // Corrupted
-                } else if (newMapId !== undefined) {
-                    impObj._eImplicitAffixCategory = newMapId;
-                } else {
-                    impObj._eImplicitAffixCategory = -1;
-                }
+            header.appendChild(nameGroup);
+            header.appendChild(rightGroup);
+            div.appendChild(header);
 
-                this.renderInspector();
-            });
+            // --- Row 2: Controls ---
+            const controls = document.createElement('div');
+            controls.className = 'affix-controls';
 
-            const innerBtn = affixSelectWrapper.querySelector('button');
-            div.appendChild(affixSelectWrapper);
-
-            // 7. Slider
             const maxVal = Math.max(1.0, affix._rollValue, isUnlocked ? 1.2 : 1.0);
-            const sliderGroup = document.createElement('div');
-            sliderGroup.className = 'form-group';
-            sliderGroup.innerHTML = `<label>Roll Coefficient</label>`;
-            const sliderContainer = document.createElement('div');
-            sliderContainer.className = 'slider-container';
 
             const slider = document.createElement('input');
             slider.type = 'range';
@@ -2435,53 +1664,43 @@ class RelicEditor {
             slider.max = maxVal;
             slider.step = 0.001;
             slider.value = affix._rollValue;
+            setTimeout(() => this.updateSliderFill(slider), 0);
 
             const numInput = document.createElement('input');
             numInput.type = 'number';
+            numInput.className = 'input-standard';
             numInput.step = 0.001;
             numInput.value = affix._rollValue.toFixed(3);
-            numInput.style.width = '80px';
 
             slider.oninput = (e) => {
                 const val = parseFloat(e.target.value);
                 affix._rollValue = val;
                 numInput.value = val.toFixed(3);
                 this.updateSliderFill(e.target);
-                if(range) div.querySelector('.calculated-value').textContent = this.calculateRealValue(val, range, level, def);
+                if (range) calcVal.textContent = this.calculateRealValue(val, range, level, def);
             };
             numInput.onchange = (e) => {
                 let val = parseFloat(e.target.value);
                 if (val > maxVal) val = maxVal;
                 affix._rollValue = val;
                 e.target.value = val.toFixed(3);
-                slider.value = affix._rollValue;
-                this.renderInspector();
+                slider.value = val;
+                this.updateSliderFill(slider);
+                if (range) calcVal.textContent = this.calculateRealValue(val, range, level, def);
             };
 
-            sliderContainer.appendChild(slider);
-            sliderContainer.appendChild(numInput);
-            sliderGroup.appendChild(sliderContainer);
-            div.appendChild(sliderGroup);
-
-            // 8. Remove
-            const footer = document.createElement('div');
-            footer.className = 'affix-footer';
             const btnRemove = document.createElement('button');
-            btnRemove.className = 'btn-remove';
+            btnRemove.className = 'btn-remove-danger';
             btnRemove.textContent = 'Remove';
             btnRemove.onclick = () => this.removeAffix(idx, true);
-            
-            footer.appendChild(btnRemove);
-            div.appendChild(footer);
 
+            controls.appendChild(slider);
+            controls.appendChild(numInput);
+            controls.appendChild(btnRemove);
+
+            div.appendChild(controls);
             list.appendChild(div);
         });
-
-        const btnAdd = document.createElement('button');
-        btnAdd.className = 'btn-add';
-        btnAdd.textContent = '+ Add Implicit';
-        btnAdd.onclick = () => this.addAffix(true);
-        list.appendChild(btnAdd);
 
         container.appendChild(list);
     }
@@ -2722,8 +1941,16 @@ class RelicEditor {
         const item = this.getSelectedItem();
         if (!item) return;
 
-        if (!isImplicit && item._affixesData && item._affixesData[affixIndex]) {
-            item._affixesData[affixIndex]._locked = isLocked;
+        if (isImplicit) {
+             // Implicits are nested inside a wrapper object
+             if (item._implicitAffixesData && item._implicitAffixesData[affixIndex] && item._implicitAffixesData[affixIndex]._relicAffixData) {
+                 item._implicitAffixesData[affixIndex]._relicAffixData._locked = isLocked;
+             }
+        } else {
+             // Explicit affixes are direct objects
+             if (item._affixesData && item._affixesData[affixIndex]) {
+                 item._affixesData[affixIndex]._locked = isLocked;
+             }
         }
     }
 
