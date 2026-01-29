@@ -52,10 +52,41 @@
             display: flex;
             flex: 1;
             overflow: hidden;
+            gap: 0;
+        }
+
+        .stash-panel {
+            width: fit-content;
+            min-width: 260px;
+            flex: 0 0 auto;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 5;
+            overflow-y: auto;
+        }
+
+        .stash-grid {
+            display: grid;
+            /* Use the NEW variable here */
+            grid-template-columns: repeat(4, var(--stash-cell-size));
+            grid-auto-rows: var(--stash-cell-size);
+            /* ... rest remains same ... */
+            gap: 4px;
+            background-color: var(--bg-color);
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            min-height: 400px;
+            align-content: start;
+            position: relative;
         }
 
         .sidebar {
-            width: 320px;
+            width: 200px;
             background-color: var(--panel-bg);
             border-right: 1px solid var(--border-color);
             padding: 20px;
@@ -464,6 +495,25 @@
             user-select: none; /* Prevent text selection while dragging */
         }
 
+        .trash-zone {
+            margin-top: auto; /* Push to bottom of stash panel */
+            border: 2px solid #f85149; /* Red dashed border */
+            color: #f85149;
+            border-radius: 6px;
+            padding: 30px;
+            text-align: center;
+            font-weight: bold;
+            cursor: default;
+            transition: all 0.2s;
+            background-color: rgba(40, 13, 13, 0.70);
+        }
+
+        .trash-zone.drag-over {
+            background-color: rgba(248, 81, 73, 0.2);
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(248, 81, 73, 0.3);
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar { width: 10px; height: 10px; }
         ::-webkit-scrollbar-track { background: var(--bg-color); border-left: 1px solid var(--border-color); }
@@ -476,7 +526,7 @@
 <div class="header">
     <h3>Relic Loadout Editor</h3>
     <div style="flex:1"></div>
-    <button onclick="app.downloadSave()" class="btn-download" id="downloadBtn" disabled>Download PlayerSave0.json</button>
+    <button onclick="app.downloadSave()" class="btn-download" id="downloadBtn" disabled>Download save file</button>
 </div>
 
 <div class="main-content">
@@ -492,18 +542,13 @@
             <span>Config DB</span> <span id="status-config" class="status-pending">Loading...</span>
         </div>
         
-        <hr>
-
         <h4>Save File</h4>
         <div class="form-group">
-            <label>PlayerSave0.json</label>
             <label class="file-upload-btn" id="lbl-save">
                 Select File
                 <input type="file" id="inp-save" onchange="app.loadSaveFile(this)" disabled>
             </label>
         </div>
-
-        <hr>
         
         <h4>Loadout Selection</h4>
         <select id="loadoutSelect" onchange="app.switchLoadout()" disabled>
@@ -514,6 +559,17 @@
             <label>Cell Size: <span id="cellSizeDisplay">80px</span></label>
             <input type="range" min="65" max="95" value="80" 
                    oninput="app.updateGridSettings(this.value)">
+        </div>
+    </div>
+
+    <div class="stash-panel">
+        <h4>Relic Stash (Not Saved)</h4>
+        <p style="font-size:0.8em; color:#8b949e; margin-top:-10px;">
+            Drag items here to store them. Items in stash are NOT exported.
+        </p>
+        <div id="stashContainer" class="stash-grid"></div>
+        <div id="trashZone" class="trash-zone">
+            Drop here to delete
         </div>
     </div>
 
@@ -569,6 +625,23 @@ class RelicEditor {
                 "Default": {w: 1, h: 1}
             }
         };
+
+        this.stashItems = []; // Items here are NOT in this.data.save
+        this.stashWidth = 8;  // 4 slots wide
+        this.stashHeight = 15; // Arbitrary height
+        this.stashCellSize = 60;
+        this.deletedItemHistory = [];
+
+        document.addEventListener('keydown', (e) => {
+        // Check for Ctrl+Z (or Cmd+Z on Mac)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            // Ignore if user is typing in an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+                e.preventDefault();
+                this.undoLastDelete();
+            }
+        });
 
         this.currentLoadoutIndex = 0;
         this.selectedRelicIndex = -1;
@@ -706,11 +779,6 @@ class RelicEditor {
         this.renderGrid();
     }
 
-    getRelicSize(relicDef) {
-        if (!relicDef) return this.definitions.sizes.Default;
-        return this.definitions.sizes[relicDef.eRelicSize] || this.definitions.sizes.Default;
-    }
-
     isValidPosition(targetItemIndex, targetX, targetY, loadout, gridWidth, gridHeight, validSlotsMask) {
         const item = loadout.Items[targetItemIndex];
         const def = this.definitions.relics[item._relicBaseDefinitionID];
@@ -761,107 +829,372 @@ class RelicEditor {
         return true;
     }
 
-    initDrag(e, item, index, element) {
-        if (e.button !== 0) return; // Only left click
-    
-        // Prevent default browser drag behavior
+    initDrag(e, item, index, element, source) {
+        if (source !== 'copy_mode' && e.button !== 0) return;
+        
+        // Prevent default to stop browser image-dragging/text-selection
         e.preventDefault(); 
-    
-        this.isDragging = true;
-        this.dragItemIndex = index;
+        
+        // 1. Store Start State (Don't start dragging visual yet)
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+        
+        this.dragItem = item;
+        this.dragIndex = index;
         this.dragElement = element;
-    
-        // Get Grid Metrics
-        const style = getComputedStyle(document.documentElement);
-        this.dragCellSize = parseInt(style.getPropertyValue('--grid-cell-size'));
-        this.dragGap = 4; // CSS gap
-        this.dragTotalUnit = this.dragCellSize + this.dragGap;
+        this.dragSource = source; // 'main' or 'stash'
 
-        // Calculate mouse offset relative to the element's top-left corner
-        const rect = element.getBoundingClientRect();
-        this.dragOffsetX = e.clientX - rect.left;
-        this.dragOffsetY = e.clientY - rect.top;
+        const def = this.definitions.relics[item._relicBaseDefinitionID];
+        this.dragItemSize = this.getRelicSize(def); // returns {w: 1, h: 2} etc.
+        
+        this.isDragging = false; // Flag to track if we actually moved
 
-        // Helper for mouse move
+        // 2. Add Listeners
         this.boundMouseMove = (ev) => this.handleDragMove(ev);
         this.boundMouseUp = (ev) => this.handleDragEnd(ev);
 
         document.addEventListener('mousemove', this.boundMouseMove);
         document.addEventListener('mouseup', this.boundMouseUp);
-
-        // Visuals
-        element.classList.add('dragging');
-        this.selectedRelicIndex = index; // Select item on start drag
-        this.renderInspector(); // Update inspector immediately
     }
 
     handleDragMove(e) {
-        if (!this.isDragging) return;
+        // 1. Threshold Check (Start Drag)
+        if (!this.isDragging) {
+            const dist = Math.hypot(e.clientX - this.dragStartX, e.clientY - this.dragStartY);
+            if (dist < 5) return; 
 
-        const container = document.getElementById('gridContainer');
-        const containerRect = container.getBoundingClientRect();
+            this.isDragging = true;
+            
+            const rect = this.dragElement.getBoundingClientRect();
+            this.dragOffsetX = this.dragStartX - rect.left;
+            this.dragOffsetY = this.dragStartY - rect.top;
+            
+            this.dragElement.style.position = 'fixed';
+            this.dragElement.style.left = rect.left + 'px';
+            this.dragElement.style.top = rect.top + 'px';
+            this.dragElement.style.zIndex = 9999;
+            this.dragElement.style.pointerEvents = 'none'; 
+            
+            document.body.appendChild(this.dragElement); 
+            this.dragElement.classList.add('dragging');
 
-        // Calculate new Position relative to container
-        let newLeft = e.clientX - containerRect.left - this.dragOffsetX;
-        let newTop = e.clientY - containerRect.top - this.dragOffsetY;
+            this.selectedRelicIndex = this.dragIndex;
+            this.selectedContainer = this.dragSource;
+            
+            this.dragGap = 4;
+        }
 
-        // Apply strictly visual update
-        this.dragElement.style.left = `${newLeft}px`;
-        this.dragElement.style.top = `${newTop}px`;
+        // 2. Update Position & Smooth Scale
+        if (this.isDragging) {
+            const mx = e.clientX;
+            const my = e.clientY;
+
+            // A. Move Element
+            this.dragElement.style.left = `${mx - this.dragOffsetX}px`;
+            this.dragElement.style.top = `${my - this.dragOffsetY}px`;
+
+            // B. Get Panel Metrics
+            const stashRect = document.getElementById('stashContainer').getBoundingClientRect();
+            const mainRect = document.getElementById('gridContainer').getBoundingClientRect();
+
+            // Calculate Centers
+            const stashCenterX = stashRect.left + stashRect.width / 2;
+            const mainCenterX = mainRect.left + mainRect.width / 2;
+
+            // C. Calculate Interpolation Factor (t)
+            // t = 0 (at Stash Center) -> t = 1 (at Main Center)
+            let t = (mx - stashCenterX) / (mainCenterX - stashCenterX);
+            
+            // Clamp t between 0.0 and 1.0 to prevent over-shrinking or over-growing
+            t = Math.max(0, Math.min(1, t));
+
+            // D. Lerp (Linear Interpolation) the Cell Size
+            const startSize = this.stashCellSize; // e.g. 60
+            const endSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size')); // e.g. 80
+            
+            // Formula: Current = Start + Percent * (End - Start)
+            const currentCellSize = startSize + t * (endSize - startSize);
+
+            // E. Apply Calculated Size
+            const w = this.dragItemSize.w;
+            const h = this.dragItemSize.h;
+            const gap = 4;
+
+            const newPixelW = w * currentCellSize + (w - 1) * gap;
+            const newPixelH = h * currentCellSize + (h - 1) * gap;
+
+            this.dragElement.style.width = `${newPixelW}px`;
+            this.dragElement.style.height = `${newPixelH}px`;
+        }
+
+        if (this.isDragging) {
+            const trash = document.getElementById('trashZone');
+            const r = trash.getBoundingClientRect();
+            if (e.clientX >= r.left && e.clientX <= r.right && 
+                e.clientY >= r.top && e.clientY <= r.bottom) {
+                trash.classList.add('drag-over');
+            } else {
+                trash.classList.remove('drag-over');
+            }
+        }
     }
 
     handleDragEnd(e) {
-        if (!this.isDragging) return;
-
-        this.isDragging = false;
         document.removeEventListener('mousemove', this.boundMouseMove);
         document.removeEventListener('mouseup', this.boundMouseUp);
-        this.dragElement.classList.remove('dragging');
+        
+        // Cleanup Trash Visuals
+        document.getElementById('trashZone').classList.remove('drag-over');
 
-        // Restore pointer events so click handler can work if needed, 
-        // though we usually want to stop propagation if we dragged.
-    
-        // 1. Calculate Grid Coordinates
-        const container = document.getElementById('gridContainer');
-        const containerRect = container.getBoundingClientRect();
-    
-        // Position of the element relative to grid container (including padding logic if any)
-        // The grid has 10px padding in CSS, let's account for that:
-        const gridPadding = 10; 
-    
-        const relX = e.clientX - containerRect.left - this.dragOffsetX - gridPadding;
-        const relY = e.clientY - containerRect.top - this.dragOffsetY - gridPadding;
-
-        // Snap to nearest integer grid slot
-        const snappedX = Math.round(relX / this.dragTotalUnit);
-        const snappedVisualY = Math.round(relY / this.dragTotalUnit);
-
-        // 2. Convert Visual Y (Top-Down) to Data Y (Bottom-Up)
-        // Need grid dimensions again
-        const shapeConfig = this.data.config.playerInventoryShapeTiers;
-        const currentShape = shapeConfig[shapeConfig.length - 1];
-    
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-        const item = loadout.Items[this.dragItemIndex];
-        const def = this.definitions.relics[item._relicBaseDefinitionID];
-        const size = this.getRelicSize(def);
-
-        // Formula: VisualY = Height - DataY - ItemHeight
-        // Therefore: DataY = Height - VisualY - ItemHeight
-        const targetDataY = currentShape.height - snappedVisualY - size.h;
-    
-        // 3. Validate
-        if (this.isValidPosition(this.dragItemIndex, snappedX, targetDataY, loadout, currentShape.width, currentShape.height, currentShape.shape)) {
-            // Success: Update Data
-            item._position.x = snappedX;
-            item._position.y = targetDataY;
-        } else {
-            // Fail: Do nothing, renderGrid will snap it back to original
-            console.log("Invalid placement");
+        if (!this.isDragging) {
+            // [Existing Click Handling...]
+            if (this.dragSource === 'copy_mode') {
+                 this.dragElement.remove(); // Just cleanup if they right-clicked but didnt move?
+                 return; 
+            }
+            this.selectedRelicIndex = this.dragIndex;
+            this.selectedContainer = this.dragSource; 
+            this.renderGrid();      
+            this.renderInspector(); 
+            return;
         }
 
+        this.isDragging = false;
+        this.dragElement.remove();
+
+        // Detect Target
+        const mainGrid = document.getElementById('gridContainer');
+        const stashGrid = document.getElementById('stashContainer');
+        const trashZone = document.getElementById('trashZone'); // NEW
+
+        const mx = e.clientX;
+        const my = e.clientY;
+
+        let targetType = null;
+        
+        // Helper check
+        const isInside = (r) => mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
+
+        if (isInside(mainGrid.getBoundingClientRect())) {
+            targetType = 'main';
+        } else if (isInside(stashGrid.getBoundingClientRect())) {
+            targetType = 'stash';
+        } else if (isInside(trashZone.getBoundingClientRect())) { // NEW
+            targetType = 'trash';
+        }
+
+        if (targetType) {
+            this.attemptDrop(targetType, mx, my);
+        } else {
+            // If dropped in void...
+            if (this.dragSource === 'copy_mode') {
+                // Cancel copy -> Do nothing (item disappears)
+            } else {
+                this.renderGrid(); // Snap back
+            }
+        }
+    }
+
+    attemptDrop(targetType, mouseX, mouseY) {
+        // 1. TRASH LOGIC
+        if (targetType === 'trash') {
+            if (this.dragSource === 'copy_mode') {
+                // Deleted a copy before placing it? Just do nothing.
+                return;
+            }
+            // Save to history
+            this.deletedItemHistory.push({
+                item: this.dragItem,
+                source: this.dragSource, // 'main' or 'stash'
+                // Save exact copy of position in case we need it
+                originalPos: { ...this.dragItem._position } 
+            });
+
+            // Delete existing item
+            if (this.dragSource === 'main') {
+                const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+                loadout.Items.splice(this.dragIndex, 1);
+            } else if (this.dragSource === 'stash') {
+                this.stashItems.splice(this.dragIndex, 1);
+            }
+            
+            this.selectedRelicIndex = -1; // Deselect
+            this.renderGrid();
+            this.renderInspector();
+            return;
+        }
+
+        // 2. Standard Drop Logic Setup
+        const isStash = (targetType === 'stash');
+        const container = isStash ? document.getElementById('stashContainer') : document.getElementById('gridContainer');
+        const rect = container.getBoundingClientRect();
+        
+        // Cell Size Logic
+        let targetCellSize;
+        if (isStash) {
+            targetCellSize = this.stashCellSize;
+        } else {
+            targetCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
+        }
+        
+        const gridPadding = 10;
+        const dragTotalUnit = targetCellSize + this.dragGap;
+        
+        const relX = mouseX - rect.left - this.dragOffsetX - gridPadding;
+        const relY = mouseY - rect.top - this.dragOffsetY - gridPadding;
+        
+        const targetX = Math.round(relX / dragTotalUnit);
+        const visualY = Math.round(relY / dragTotalUnit);
+
+        // 3. Grid References
+        let gridW, gridH, targetArray;
+        let finalDataY = visualY; 
+        
+        const shapeConfig = this.data.config.playerInventoryShapeTiers;
+        const currentShape = shapeConfig[shapeConfig.length - 1];
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const def = this.definitions.relics[this.dragItem._relicBaseDefinitionID];
+        const size = this.getRelicSize(def);
+
+        if (isStash) {
+            gridW = this.stashWidth;
+            gridH = this.stashHeight;
+            targetArray = this.stashItems;
+        } else {
+            gridW = currentShape.width;
+            gridH = currentShape.height;
+            targetArray = loadout.Items;
+            finalDataY = gridH - visualY - size.h;
+        }
+
+        // 4. Validation & Collision
+        if (targetX < 0 || visualY < 0 || targetX + size.w > gridW || visualY + size.h > gridH) {
+            if (this.dragSource !== 'copy_mode') this.renderGrid(); 
+            return;
+        }
+
+        // Filter collision list
+        let collisionList = targetArray;
+        // CRITICAL: If copying, we check against EVERYTHING in the target (because the new item isn't in there yet)
+        // If moving existing item, we ignore self.
+        if (this.dragSource === targetType && this.dragSource !== 'copy_mode') {
+            collisionList = targetArray.filter((_, i) => i !== this.dragIndex);
+        }
+
+        for (let other of collisionList) {
+            const oDef = this.definitions.relics[other._relicBaseDefinitionID];
+            const oSize = this.getRelicSize(oDef);
+            const overlap = !(targetX >= other._position.x + oSize.w || targetX + size.w <= other._position.x || finalDataY >= other._position.y + oSize.h || finalDataY + size.h <= other._position.y);
+            if (overlap) { 
+                if (this.dragSource !== 'copy_mode') this.renderGrid(); 
+                return; 
+            }
+        }
+
+        if (!isStash) {
+             for(let w = 0; w < size.w; w++) {
+                 for(let h = 0; h < size.h; h++) {
+                     const cx = targetX + w;
+                     const cy = finalDataY + h;
+                     const vRow = gridH - 1 - cy; 
+                     if (!currentShape.shape[vRow * gridW + cx]) {
+                         if (this.dragSource !== 'copy_mode') this.renderGrid(); 
+                         return; 
+                     }
+                 }
+             }
+        }
+
+        // 5. Commit Move
+        
+        // A. Remove from old (ONLY if NOT copying)
+        if (this.dragSource !== 'copy_mode') {
+            if (this.dragSource === 'main') {
+                loadout.Items.splice(this.dragIndex, 1);
+            } else if (this.dragSource === 'stash') {
+                this.stashItems.splice(this.dragIndex, 1);
+            }
+        }
+
+        // B. Update Coords
+        this.dragItem._position.x = targetX;
+        this.dragItem._position.y = finalDataY;
+
+        // C. Add to new
+        if (targetType === 'main') {
+            loadout.Items.push(this.dragItem);
+        } else {
+            this.stashItems.push(this.dragItem);
+        }
+
+        this.selectedContainer = targetType;
+        this.selectedRelicIndex = (targetType === 'main' ? loadout.Items.length : this.stashItems.length) - 1;
+
         this.renderGrid();
-        this.renderInspector(); // Update X/Y inputs in sidebar
+        this.renderInspector();
+    }
+
+    undoLastDelete() {
+        if (this.deletedItemHistory.length === 0) {
+            console.log("Nothing to undo.");
+            return;
+        }
+
+        // 1. Retrieve last deleted item
+        const record = this.deletedItemHistory.pop();
+        const item = record.item;
+        
+        // 2. Determine Destination
+        let targetArray, gridW, gridH, currentShape;
+        const isStash = (record.source === 'stash');
+
+        if (isStash) {
+            targetArray = this.stashItems;
+            gridW = this.stashWidth;
+            gridH = this.stashHeight;
+        } else {
+            const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+            targetArray = loadout.Items;
+            
+            const shapeConfig = this.data.config.playerInventoryShapeTiers;
+            currentShape = shapeConfig[shapeConfig.length - 1];
+            gridW = currentShape.width;
+            gridH = currentShape.height;
+        }
+
+        // 3. Collision Check (Crucial: The spot might now be taken!)
+        const def = this.definitions.relics[item._relicBaseDefinitionID];
+        const size = this.getRelicSize(def);
+        
+        // Check against all CURRENT items in that list
+        const isBlocked = targetArray.some(other => {
+            const oDef = this.definitions.relics[other._relicBaseDefinitionID];
+            const oSize = this.getRelicSize(oDef);
+            
+            return !(
+                item._position.x >= other._position.x + oSize.w || 
+                item._position.x + size.w <= other._position.x || 
+                item._position.y >= other._position.y + oSize.h || 
+                item._position.y + size.h <= other._position.y
+            );
+        });
+
+        if (isBlocked) {
+            alert("Cannot undo: The original slot is now occupied.");
+            // Optional: Push back to history so it's not lost? 
+            // this.deletedItemHistory.push(record); 
+            return;
+        }
+
+        // 4. Restore Item
+        targetArray.push(item);
+        
+        // Select the restored item
+        this.selectedContainer = record.source;
+        this.selectedRelicIndex = targetArray.length - 1;
+
+        this.renderGrid();
+        this.renderInspector();
     }
 
     renderGrid() {
@@ -910,132 +1243,72 @@ class RelicEditor {
             el.onmousedown = (e) => {
                 e.stopPropagation(); // Stop grid interaction
                 // Start Drag Logic
-                this.initDrag(e, item, index, el);
+                this.initDrag(e, item, index, el, 'main');
+            };
+
+            el.oncontextmenu = (e) => {
+                e.preventDefault(); 
+                e.stopPropagation();
+                this.startCopy(e, item);
             };
 
             container.appendChild(el);
         });
+        this.renderStash();
     }
 
-    extractName(def) {
-        if (Array.isArray(def.nameLocalizationKey)) {
-            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
-            return en ? en.langTranslation : def.nameLocalizationKey[0].langTranslation;
+    renderStash() {
+        const container = document.getElementById('stashContainer');
+        container.innerHTML = '';
+
+        // 1. Set Grid Template using Fixed Size
+        container.style.gridTemplateColumns = `repeat(${this.stashWidth}, ${this.stashCellSize}px)`;
+        container.style.gridTemplateRows = `repeat(${this.stashHeight}, ${this.stashCellSize}px)`;
+
+        // Draw Background Slots
+        const totalSlots = this.stashWidth * this.stashHeight;
+        for(let i=0; i<totalSlots; i++) {
+            const div = document.createElement('div');
+            div.className = 'grid-slot';
+            // Force slots to fixed size
+            div.style.width = `${this.stashCellSize}px`;
+            div.style.height = `${this.stashCellSize}px`;
+            container.appendChild(div);
         }
-        return def.name;
-    }
 
-    formatString(str) {
-        if (!str) return '';
-        return str.replace(/([A-Z])/g, ' $1') // 1. Add space before capitals
-                  .replace(/\s+/g, ' ')       // 2. Collapse multiple spaces into one
-                  .trim();                    // 3. Remove leading/trailing spaces
-    }
-
-    getAffixName(affixId) {
-        const def = this.definitions.affixes[affixId];
-        if (!def) return `ID: ${affixId}`;
+        // Draw Items
+        this.stashItems.forEach((item, index) => {
+            const def = this.definitions.relics[item._relicBaseDefinitionID];
+            const size = this.getRelicSize(def);
         
-        // Priority 1: name (formatted)
-        if (def.name) {
-            return this.formatString(def.name);
-        }
-
-        // Priority 2: eStatDefinition (formatted)
-        if (def.eStatDefinition) {
-            return this.formatString(def.eStatDefinition);
-        }
-
-        // Priority 3: fallback to localization
-        if (Array.isArray(def.nameLocalizationKey)) {
-            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
-            return en ? en.langTranslation : def.nameLocalizationKey[0].langTranslation;
-        }
+            const el = document.createElement('div');
+            el.className = `relic-item rarity-${item._eRelicRarity}`;
+            if (this.selectedContainer === 'stash' && index === this.selectedRelicIndex) el.classList.add('selected');
         
-        return `ID: ${affixId}`;
-    }
+            // 2. Use Fixed Size for Item Calculations
+            const cellSize = this.stashCellSize;
+            const gap = 4;
 
-    getAffixRange(affixId, tier) {
-        const def = this.definitions.affixes[affixId];
-        if (!def || !def.tierRollRanges) return null;
+            el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
+            el.style.top = `${item._position.y * (cellSize + gap) + 10}px`;
+            el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
+            el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
         
-        const tierData = def.tierRollRanges.find(t => t.tier === tier);
-        return tierData ? tierData.rollRange : null; 
-    }
+            el.innerHTML = `<strong>${def ? this.extractName(def) : 'Unknown'}</strong>`;
 
-    getUpgradeMultiplier(level, affixDef) {
-        let mods = null;
+            el.onmousedown = (e) => {
+                e.stopPropagation();
+                this.initDrag(e, item, index, el, 'stash');
+            };
 
-        // 1. Check for Affix-Specific Config (The "Multiplicative" override)
-        if (affixDef && affixDef.relicUpgradeModifierConfig && affixDef.relicUpgradeModifierConfig.upgradeModifier) {
-            mods = affixDef.relicUpgradeModifierConfig.upgradeModifier;
-        }
-        // 2. Check for Global Default (Loaded from file)
-        else if (this.definitions.defaultUpgradeModifiers) {
-            mods = this.definitions.defaultUpgradeModifiers;
-        }
-        // 3. Fallback to Hardcoded Standard
-        else {
-            mods = this.definitions.fallbackUpgradeModifiers;
-        }
+            el.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.startCopy(e, item);
+            };
 
-        if (mods) {
-            const val = mods[String(level)];
-            return val !== undefined ? parseFloat(val) : 1.0;
-        }
-        return 1.0;
-    }
-
-    getAdditiveOverrideConfig(affixDef) {
-        if (!affixDef) return null;
-        // Check 1: Root property
-        if (affixDef.upgradeModifierOverride) return affixDef.upgradeModifierOverride;
-        // Check 2: Nested inside modifier config
-        if (affixDef.relicUpgradeModifierConfig && affixDef.relicUpgradeModifierConfig.upgradeModifierOverride) {
-            return affixDef.relicUpgradeModifierConfig.upgradeModifierOverride;
-        }
-        return null;
-    }
-
-    addAffix(isImplicit) {
-        if (this.currentLoadoutIndex === -1 || this.selectedRelicIndex === -1) return;
-        
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-        const item = loadout.Items[this.selectedRelicIndex];
-        
-        // Default new affix template
-        // We use ID 0 as a placeholder (user can change it via dropdown)
-        const newAffix = {
-            _relicAffixDefinitionId: 0, 
-            _rollValue: 0.5,
-            _locked: false,
-            _tier: item._tier || 1
-        };
-
-        if (isImplicit) {
-            if (!item._implicitAffixesData) item._implicitAffixesData = [];
-            // Implicit affixes are wrapped in a container object
-            item._implicitAffixesData.push({ _relicAffixData: newAffix });
-        } else {
-            if (!item._affixesData) item._affixesData = [];
-            item._affixesData.push(newAffix);
-        }
-        
-        this.renderInspector();
-    }
-
-    removeAffix(index, isImplicit) {
-        
-        if (this.currentLoadoutIndex === -1 || this.selectedRelicIndex === -1) return;
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-        const item = loadout.Items[this.selectedRelicIndex];
-
-        if (isImplicit && item._implicitAffixesData) {
-            item._implicitAffixesData.splice(index, 1);
-        } else if (!isImplicit && item._affixesData) {
-            item._affixesData.splice(index, 1);
-        }
-        this.renderInspector();
+            container.appendChild(el);
+        });
     }
 
     calculateRealValue(roll, range, level, affixDef) {
@@ -1111,13 +1384,13 @@ class RelicEditor {
         const container = document.getElementById('inspectorContent');
         container.innerHTML = '';
 
-        if (this.selectedRelicIndex === -1) {
+        const item = this.getSelectedItem(); // Use the new helper
+
+        if (!item) {
             container.innerHTML = '<p style="color: #666; font-style: italic;">Select a relic to edit details.</p>';
             return;
         }
 
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-        const item = loadout.Items[this.selectedRelicIndex];
         const def = this.definitions.relics[item._relicBaseDefinitionID];
 
         // Header
@@ -1504,16 +1777,6 @@ class RelicEditor {
         container.appendChild(list);
     }
 
-    getImplicitCategoryName(catId) {
-        switch(catId) {
-            case 0: return "Fury";       
-            case 1: return "Faith";      
-            case 2: return "Discipline";
-            case 3: return "Corrupted";
-            default: return "None";
-        }
-    }
-
     renderImplicitAffixList(container, implicitData, title, tier, level, isUnlocked) {
         if (!implicitData || implicitData.length === 0) return;
 
@@ -1757,25 +2020,6 @@ class RelicEditor {
         return div;
     }
 
-    updateItemAscension(isAscended) {
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-        const item = loadout.Items[this.selectedRelicIndex];
-        if (item) {
-            item._ascended = isAscended;
-            this.renderInspector();
-        }
-    }
-
-    updateAffixLock(affixIndex, isLocked, isImplicit) {
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
-        const item = loadout.Items[this.selectedRelicIndex];
-        if (item) {
-            if(!isImplicit && item._affixesData[affixIndex]) {
-                item._affixesData[affixIndex]._locked = isLocked;
-            }
-        }
-    }
-
     downloadSave() {
         if (!this.data.save) return;
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data.save, null, 4));
@@ -1786,6 +2030,210 @@ class RelicEditor {
         a.click();
         a.remove();
     }
+
+    // --- HELPERS ----
+
+    getSelectedItem() {
+        if (this.selectedRelicIndex === -1) return null;
+        
+        // Check if we are selecting from Stash
+        if (this.selectedContainer === 'stash') {
+            return this.stashItems[this.selectedRelicIndex];
+        }
+        
+        // Otherwise, check Main Loadout
+        if (this.currentLoadoutIndex !== -1 && this.data.save) {
+            const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+            if (loadout && loadout.Items) {
+                return loadout.Items[this.selectedRelicIndex];
+            }
+        }
+        
+        return null;
+    }
+
+    updateAffixLock(affixIndex, isLocked, isImplicit) {
+        const item = this.getSelectedItem();
+        if (!item) return;
+
+        if (!isImplicit && item._affixesData && item._affixesData[affixIndex]) {
+            item._affixesData[affixIndex]._locked = isLocked;
+        }
+    }
+
+    addAffix(isImplicit) {
+        const item = this.getSelectedItem();
+        if (!item) return;
+        
+        // Default new affix template
+        // We use ID 0 as a placeholder (user can change it via dropdown)
+        const newAffix = {
+            _relicAffixDefinitionId: 0, 
+            _rollValue: 0.5,
+            _locked: false,
+            _tier: item._tier || 1
+        };
+
+        if (isImplicit) {
+            if (!item._implicitAffixesData) item._implicitAffixesData = [];
+            // Implicit affixes are wrapped in a container object
+            item._implicitAffixesData.push({ _relicAffixData: newAffix });
+        } else {
+            if (!item._affixesData) item._affixesData = [];
+            item._affixesData.push(newAffix);
+        }
+        
+        this.renderInspector();
+    }
+
+    removeAffix(index, isImplicit) {
+        const item = this.getSelectedItem();
+        if (!item) return;
+
+        if (isImplicit && item._implicitAffixesData) {
+            item._implicitAffixesData.splice(index, 1);
+        } else if (!isImplicit && item._affixesData) {
+            item._affixesData.splice(index, 1);
+        }
+        this.renderInspector();
+    }
+
+    extractName(def) {
+        if (Array.isArray(def.nameLocalizationKey)) {
+            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
+            return en ? en.langTranslation : def.nameLocalizationKey[0].langTranslation;
+        }
+        return def.name;
+    }
+
+    formatString(str) {
+        if (!str) return '';
+        return str.replace(/([A-Z])/g, ' $1') // 1. Add space before capitals
+                  .replace(/\s+/g, ' ')       // 2. Collapse multiple spaces into one
+                  .trim();                    // 3. Remove leading/trailing spaces
+    }
+
+    getAffixName(affixId) {
+        const def = this.definitions.affixes[affixId];
+        if (!def) return `ID: ${affixId}`;
+        
+        // Priority 1: name (formatted)
+        if (def.name) {
+            return this.formatString(def.name);
+        }
+
+        // Priority 2: eStatDefinition (formatted)
+        if (def.eStatDefinition) {
+            return this.formatString(def.eStatDefinition);
+        }
+
+        // Priority 3: fallback to localization
+        if (Array.isArray(def.nameLocalizationKey)) {
+            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
+            return en ? en.langTranslation : def.nameLocalizationKey[0].langTranslation;
+        }
+        
+        return `ID: ${affixId}`;
+    }
+
+    getAffixRange(affixId, tier) {
+        const def = this.definitions.affixes[affixId];
+        if (!def || !def.tierRollRanges) return null;
+        
+        const tierData = def.tierRollRanges.find(t => t.tier === tier);
+        return tierData ? tierData.rollRange : null; 
+    }
+
+    getUpgradeMultiplier(level, affixDef) {
+        let mods = null;
+
+        // 1. Check for Affix-Specific Config (The "Multiplicative" override)
+        if (affixDef && affixDef.relicUpgradeModifierConfig && affixDef.relicUpgradeModifierConfig.upgradeModifier) {
+            mods = affixDef.relicUpgradeModifierConfig.upgradeModifier;
+        }
+        // 2. Check for Global Default (Loaded from file)
+        else if (this.definitions.defaultUpgradeModifiers) {
+            mods = this.definitions.defaultUpgradeModifiers;
+        }
+        // 3. Fallback to Hardcoded Standard
+        else {
+            mods = this.definitions.fallbackUpgradeModifiers;
+        }
+
+        if (mods) {
+            const val = mods[String(level)];
+            return val !== undefined ? parseFloat(val) : 1.0;
+        }
+        return 1.0;
+    }
+
+    getAdditiveOverrideConfig(affixDef) {
+        if (!affixDef) return null;
+        // Check 1: Root property
+        if (affixDef.upgradeModifierOverride) return affixDef.upgradeModifierOverride;
+        // Check 2: Nested inside modifier config
+        if (affixDef.relicUpgradeModifierConfig && affixDef.relicUpgradeModifierConfig.upgradeModifierOverride) {
+            return affixDef.relicUpgradeModifierConfig.upgradeModifierOverride;
+        }
+        return null;
+    }
+
+    getImplicitCategoryName(catId) {
+        switch(catId) {
+            case 0: return "Fury";       
+            case 1: return "Faith";      
+            case 2: return "Discipline";
+            case 3: return "Corrupted";
+            default: return "None";
+        }
+    }
+
+    getRelicSize(relicDef) {
+        if (!relicDef) return this.definitions.sizes.Default;
+        return this.definitions.sizes[relicDef.eRelicSize] || this.definitions.sizes.Default;
+    }
+
+    startCopy(e, originalItem) {
+        // 1. Deep Clone the Item Data
+        const clone = JSON.parse(JSON.stringify(originalItem));
+        
+        // 2. Create a Visual Element for the Clone
+        const def = this.definitions.relics[clone._relicBaseDefinitionID];
+        const size = this.getRelicSize(def);
+        
+        const el = document.createElement('div');
+        el.className = `relic-item rarity-${clone._eRelicRarity} dragging`;
+        el.innerHTML = `<strong>${def ? this.extractName(def) : 'Copy'}</strong>`;
+        
+        // Size it correctly (use Main Grid size by default for visuals)
+        const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
+        const gap = 4;
+        el.style.width = `${size.w * currentCellSize + (size.w - 1) * gap}px`;
+        el.style.height = `${size.h * currentCellSize + (size.h - 1) * gap}px`;
+        
+        // 3. Position at Mouse
+        el.style.position = 'fixed';
+        el.style.zIndex = 9999;
+        // Center the item on the cursor
+        el.style.left = `${e.clientX - (parseInt(el.style.width)/2)}px`; 
+        el.style.top = `${e.clientY - (parseInt(el.style.height)/2)}px`;
+        el.style.pointerEvents = 'none';
+
+        document.body.appendChild(el);
+
+        // 4. Force Start Drag
+        // We pass 'copy_mode' as the source so attemptDrop knows not to delete the original
+        this.initDrag(e, clone, -1, el, 'copy_mode');
+        
+        // Manually set isDragging to true since we skipped the threshold check
+        this.isDragging = true;
+        
+        // Manually set offsets so it centers on mouse
+        const rect = el.getBoundingClientRect();
+        this.dragOffsetX = e.clientX - rect.left;
+        this.dragOffsetY = e.clientY - rect.top;
+    }
+
 }
 
 const app = new RelicEditor();
