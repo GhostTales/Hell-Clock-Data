@@ -1226,7 +1226,9 @@ class RelicEditor {
             
             const el = document.createElement('div');
             el.className = `relic-item rarity-${item._eRelicRarity}`;
-            if (index === this.selectedRelicIndex) el.classList.add('selected');
+            if (this.selectedContainer === 'main' && index === this.selectedRelicIndex) {
+                el.classList.add('selected');
+            }
 
             const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
             const gap = 4;
