@@ -701,16 +701,8 @@
             <input type="text" id="relicSearchInput" class="modal-search" placeholder="Filter relics by name..." onkeyup="app.filterCreationList()">
         </div>
 
-        <div style="display: flex; gap: 20px; flex: 1; overflow: hidden; min-height: 0;">
-            <div style="flex: 1; display: flex; flex-direction: column;">
-                <h5 style="margin: 0 0 10px 0; color: var(--accent-color);">Basic Relics (Tiered)</h5>
-                <div id="basicRelicList" class="affix-search-list" style="flex: 1; overflow-y: auto;"></div>
-            </div>
-
-            <div style="flex: 1; display: flex; flex-direction: column;">
-                <h5 style="margin: 0 0 10px 0; color: #f85149;">Unique Relics</h5>
-                <div id="uniqueRelicList" class="affix-search-list" style="flex: 1; overflow-y: auto;"></div>
-            </div>
+        <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0;">
+            <div id="unifiedRelicList" class="affix-search-list" style="flex: 1; overflow-y: auto;"></div>
         </div>
     </div>
 </div>
@@ -2283,47 +2275,73 @@ class RelicEditor {
 
     openCreationModal() {
         const modal = document.getElementById('creationModal');
-        const basicList = document.getElementById('basicRelicList');
-        const uniqueList = document.getElementById('uniqueRelicList');
+        const listContainer = document.getElementById('unifiedRelicList');
         
-        // Clear lists
-        basicList.innerHTML = '';
-        uniqueList.innerHTML = '';
+        // Clear list
+        listContainer.innerHTML = '';
 
         if (!this.data.relics || !this.data.relics.Relics) {
             alert("Relic database not loaded yet.");
             return;
         }
 
-        // 1. Sort and Categorize
-        const relics = this.data.relics.Relics.filter(r => r.canDrop !== false);
-        
-        relics.forEach(relic => {
-            // Check if it's a "Tiered" basic relic
-            const isBasic = relic.name.includes("_Tier");
-            const listContainer = isBasic ? basicList : uniqueList;
+        // Filter Logic
+        const filtered = this.data.relics.Relics.filter(r => {
+            // 1. Generic Check: Does the name contain "_Tier4"?
+            // We ignore 'canDrop' for these because base templates might be hidden
+            if (r.name.includes("_Tier4")) {
+                return true;
+            }
+
+            // 2. Check for Unique Relics (Respect canDrop)
+            if (r.type === "UniqueRelicBaseDefinition" && r.canDrop !== false) {
+                return true;
+            }
+
+            return false;
+        });
+
+        // Sort: Tier 4 items first, then Uniques alphabetically
+        filtered.sort((a, b) => {
+            const aIsTier4 = a.name.includes("_Tier4");
+            const bIsTier4 = b.name.includes("_Tier4");
+
+            // If both are Tier 4, sort alphabetically 
+            // (e.g. Exalted -> Grand -> Large -> Small)
+            if (aIsTier4 && bIsTier4) {
+                return a.name.localeCompare(b.name);
+            }
+
+            // If one is Tier 4 and the other isn't, Tier 4 wins (Top of list)
+            if (aIsTier4 && !bIsTier4) return -1;
+            if (!aIsTier4 && bIsTier4) return 1;
             
+            // Otherwise (both Uniques), sort alphabetically
+            return a.name.localeCompare(b.name);
+        });
+
+        // Render
+        filtered.forEach(relic => {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'search-item';
             itemDiv.dataset.name = relic.name.toLowerCase();
             
-            // Format Display Name
             let displayName = relic.name;
-            // Optional: Clean up name for display if desired
-            if (isBasic) {
-                // e.g. "SmallRelic_Tier1_Skull" -> "Small Relic (Skull)" could be done here
+            let typeLabel = "";
+            let subTextColor = "var(--text-muted)";
+
+            if (!relic.name.includes("_Tier4")) {
+                // Unique Relic
+                typeLabel = `<span style="color:#f85149; font-size:0.8em; border:1px solid #f85149; padding:0 4px; border-radius:4px;">UNIQUE</span>`;
             }
 
-            let subText = `ID: ${relic.id} | Size: ${relic.eRelicSize}`;
-
-            // NOTE: Added 'event' to the onclick call so we can grab mouse coordinates
             itemDiv.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%">
                     <div style="overflow:hidden; text-overflow:ellipsis;">
                         <strong>${displayName}</strong>
-                        <small>${subText}</small>
+                        <div style="margin-top:2px;">${typeLabel}</div>
                     </div>
-                    <button class="btn-add" style="width:auto; padding:2px 8px; margin-left:10px;" 
+                    <button class="btn-add" style="width:auto; padding:4px 12px; margin-left:10px;" 
                         onclick="app.createRelic(event, ${relic.id})">Create</button>
                 </div>
             `;
@@ -2356,18 +2374,24 @@ class RelicEditor {
         const def = this.definitions.relics[relicDefId];
         if (!def) return console.error("Relic definition not found");
 
-        // 2. Determine Tier & Rarity
-        let targetTier = 1;
-        let targetRarity = 1; // Default to Magic (Blue)
+        // 2. Determine Stats based on Type
+        let targetTier = 4;     // Default to Tier 4
+        let targetRarity = 1;   
+        let targetLevel = 0;    
 
         const tierMatch = def.name.match(/_Tier(\d+)/);
 
         if (tierMatch) {
-            targetTier = parseInt(tierMatch[1]);
-            targetRarity = 1; 
+            // --- BASIC RELIC CONFIG ---
+            // Requirement: Default to Tier 4, Rarity 2 (Rare), Level 5
+            targetTier = 4;
+            targetRarity = 2; // 0=Common, 1=Magic, 2=Rare, 3=Unique
+            targetLevel = 5;
         } else {
+            // --- UNIQUE RELIC CONFIG ---
             targetTier = 4; 
-            targetRarity = 3; // Unique/Red
+            targetRarity = 3; // Unique Rarity
+            targetLevel = 5;  // Default level for uniques
         }
 
         // 3. Create Instance
@@ -2375,26 +2399,23 @@ class RelicEditor {
             _relicBaseDefinitionID: def.id,
             _position: { x: 0, y: 0 }, 
             _tier: targetTier,
-            _upgradeLevel: 0,
+            _upgradeLevel: targetLevel,
             _eRelicRarity: targetRarity,
             _affixesData: [],
             _implicitAffixesData: []
         };
 
-        // --- UPDATED LOGIC: Add Intrinsic as NORMAL Affixes ---
+        // Add Intrinsic Affixes (if any) as Normal Affixes
         if (def.intrinsicAffixes && Array.isArray(def.intrinsicAffixes)) {
             def.intrinsicAffixes.forEach(affixDef => {
-                // We push directly to _affixesData (Normal) 
-                // and do NOT use the _relicAffixData wrapper (which is only for implicits)
                 newRelic._affixesData.push({
                     _relicAffixDefinitionId: affixDef.id,
-                    _rollValue: 0.5, // Default to mid-roll
+                    _rollValue: 0.5,
                     _locked: false,
                     _tier: newRelic._tier
                 });
             });
         }
-        // -----------------------------------------------------
 
         // 4. Create Visual Element for Dragging
         const size = this.getRelicSize(def);
