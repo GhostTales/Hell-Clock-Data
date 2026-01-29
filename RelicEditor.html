@@ -830,6 +830,9 @@ class RelicEditor {
     }
 
     initDrag(e, item, index, element, source) {
+        // Fix: Prevent starting a new drag if one is already active
+        if (this.isDragging) return;
+        
         if (source !== 'copy_mode' && e.button !== 0) return;
         
         // Prevent default to stop browser image-dragging/text-selection
@@ -2196,6 +2199,9 @@ class RelicEditor {
     }
 
     startCopy(e, originalItem) {
+        // Prevent copying if already dragging something
+        if (this.isDragging) return;
+
         // 1. Deep Clone the Item Data
         const clone = JSON.parse(JSON.stringify(originalItem));
         
