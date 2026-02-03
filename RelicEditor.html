@@ -987,7 +987,7 @@ class RelicEditor {
         const statsGrid = document.createElement('div');
         statsGrid.style.display = 'grid';
         statsGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'; 
-        statsGrid.style.gap = '10px';
+        statsGrid.style.gap = '20px';
         statsGrid.style.marginBottom = '12px';
         
         // Helper to create grid items
@@ -1004,7 +1004,8 @@ class RelicEditor {
             const inp = document.createElement('input');
             inp.type = 'number';
             inp.className = 'input-standard'; 
-            inp.style.width = '100%';
+            // CHANGED: Overridden width to 100% to widen inputs
+            inp.style.setProperty('width', '100%', 'important'); 
             inp.value = val;
             
             inp.onchange = (e) => {
@@ -1019,8 +1020,47 @@ class RelicEditor {
             return wrap;
         };
 
+        // Helper for Dropdown (New)
+        const createSelect = (label, val, options, onChange) => {
+            const wrap = document.createElement('div');
+            
+            const lbl = document.createElement('div');
+            lbl.textContent = label;
+            lbl.style.fontSize = '0.75em';
+            lbl.style.color = 'var(--text-muted)';
+            lbl.style.marginBottom = '6px';
+            lbl.style.fontWeight = '500';
+
+            const sel = document.createElement('select');
+            // Style matching the theme
+            sel.style.cssText = `
+                width: 100%; 
+                background-color: var(--input-bg); 
+                border: 1px solid var(--border-color); 
+                color: var(--text-color); 
+                padding: 4px 8px; 
+                border-radius: 4px; 
+                height: 28px;
+                font-size: 0.9rem;
+            `;
+
+            options.forEach(opt => {
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.text = opt.text;
+                if (opt.value === val) el.selected = true;
+                sel.appendChild(el);
+            });
+
+            sel.onchange = (e) => onChange(parseInt(e.target.value));
+
+            wrap.appendChild(lbl);
+            wrap.appendChild(sel);
+            return wrap;
+        };
+
         // Level
-        statsGrid.appendChild(createGridInput('Level', item._upgradeLevel, 0, 5, (v) => {
+        statsGrid.appendChild(createGridInput('Level', item._upgradeLevel, 0, 10, (v) => {
             item._upgradeLevel = v;
             this.renderInspector();
         }));
@@ -1037,8 +1077,15 @@ class RelicEditor {
             this.renderInspector();
         }));
 
-        // Rarity
-        statsGrid.appendChild(createGridInput('Rarity', item._eRelicRarity, 0, 3, (v) => {
+        // Rarity (Converted to Dropdown)
+        const rarityOpts = [
+            { value: 0, text: 'Common' },
+            { value: 1, text: 'Magic' },
+            { value: 2, text: 'Rare' },
+            { value: 3, text: 'Unique' }
+        ];
+
+        statsGrid.appendChild(createSelect('Rarity', item._eRelicRarity, rarityOpts, (v) => {
             item._eRelicRarity = v;
             this.renderGrid(); 
         }));
@@ -1102,15 +1149,12 @@ class RelicEditor {
         const isSecFull = this.hasReachedAffixLimit(item, 'secondary');
 
         // --- UPDATED LOGIC: SHARED LIMIT FOR UNIQUE & RARE ---
-        // Since 'uniqueList' contains both Unique and Rare affixes, 
-        // if it has ANY entries (length > 0), the slot is taken.
-        // This ensures if a relic has a Unique, you cannot add a Rare.
         const isUniqueOrRareFull = uniqueList.length > 0;
 
         // 1. UNIQUE / RARE LIST
         const btnRare = [{
             label: '+ Add Rare',
-            disabled: isUniqueOrRareFull, // Disable button if slot is occupied
+            disabled: isUniqueOrRareFull, 
             onClick: () => {
                 this.activeAffixType = 'rare'; 
                 this.openAffixModal(null, (id) => this.addSpecificAffix(id));
@@ -1155,7 +1199,6 @@ class RelicEditor {
         });
 
         // 3. PRIMARY LIST
-        // Only render if restrictions are OFF, or if the list actually has items
         if (!this.restrictAffixes || primaryList.length > 0) {
             const btnPrimary = [{
                 label: '+ Add Primary',
