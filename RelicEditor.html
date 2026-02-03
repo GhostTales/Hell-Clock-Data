@@ -49,6 +49,16 @@
                     Enforce affix limits and pools.
                 </p>
             </div>
+
+            <div style="margin-top: 10px; padding-top: 5px;">
+                <label style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 0.85em;">
+                    <span>Restrict Search</span>
+                    <input type="checkbox" id="chk-search-restrict" checked onchange="app.toggleSearchRestrictions(this)">
+                </label>
+                <p style="font-size: 0.75em; color: #8b949e; margin: 4px 0 0 0;">
+                    Filter modal to valid pools only.
+                </p>
+            </div>
         </div>
 
         <div class="sidebar-section">
@@ -262,6 +272,11 @@ class RelicEditor {
             if (restrictCheckbox) {
                 // Ensure internal state matches the HTML 'checked' attribute
                 this.restrictAffixes = restrictCheckbox.checked; 
+            }
+
+            const searchRestrictCheckbox = document.getElementById('chk-search-restrict');
+            if (searchRestrictCheckbox) {
+                this.restrictSearch = searchRestrictCheckbox.checked;
             }
             
         } catch (error) {
@@ -1197,7 +1212,7 @@ class RelicEditor {
             rawDef: def
         })).sort((a, b) => a.name.localeCompare(b.name));
 
-        this.renderAffixSearchList(this.allAffixOptions);
+        this.filterAffixes();
     }
 
     closeModal() {
@@ -1246,18 +1261,18 @@ class RelicEditor {
         const filterType = document.getElementById('affixFilterSelect').value; 
         const mapping = this.data.implicit_mapping || {};
 
-        /// --- RESTRICTION LOGIC ---
-        let allowedIds = null;
-        let blockedCategories = []; // Used for Implicits
+        // --- RESTRICTION LOGIC ---
+        let allowedIds = []; // Default to empty array (safe)
+        let blockedCategories = []; 
 
-        if (this.restrictAffixes && this.activeAffixType && this.selectedRelicIndex !== -1) {
+        // 1. PRE-CALCULATE RESTRICTIONS (Only if a relic is selected)
+        if (this.restrictSearch && this.activeAffixType && this.selectedRelicIndex !== -1) {
              const item = this.getSelectedItem();
              if (item) {
                  if (this.activeAffixType === 'implicit') {
                      // IMPLICIT LOGIC
                      const currentImplicits = item._implicitAffixesData || [];
                      
-                     // Check what we already have
                      let hasCorrupted = false;
                      let hasType = false; // Fury, Faith, or Discipline
 
@@ -1275,7 +1290,9 @@ class RelicEditor {
                      }
                  } else {
                      // PRIMARY / SECONDARY LOGIC
-                     allowedIds = this.getAllowedAffixIds(item._relicBaseDefinitionID, this.activeAffixType);
+                     // Fetch the allowed list. Defaults to [] if nothing found.
+                     const list = this.getAllowedAffixIds(item._relicBaseDefinitionID, this.activeAffixType);
+                     allowedIds = list || []; 
                  }
              }
         }
@@ -1288,20 +1305,23 @@ class RelicEditor {
             const name = opt.name.toLowerCase();
             const id = String(opt.id);
 
-            // --- NEW: POOL CHECK ---
-            if (this.restrictAffixes && this.activeAffixType) {
+            // --- POOL / RESTRICTION CHECK ---
+            if (this.restrictSearch && this.activeAffixType) {
                 if (this.activeAffixType === 'implicit') {
                     // Check Implicit Rules
                     const cat = this.getAffixCategory(def.id);
-                    // Filter out if category matches a blocked one
+
+                    // FIX: Ensure we only show valid Implicit types (Fury, Faith, Discipline, Corrupted)
+                    // If cat is -1, it's a standard affix and should be hidden in implicit mode.
+                    if (cat === -1) return false;
+
+                    // Filter out categories already present on the item (e.g. max 1 Type, max 1 Corrupted)
                     if (blockedCategories.includes(cat)) return false;
-                    // Filter out if it's not a valid implicit category at all (optional, depending on if you want random stats allowed)
-                    if (cat === -1) return false; 
+
                 } else {
                     // Check Primary/Secondary Pools
-                    if (allowedIds && !allowedIds.includes(def.id)) {
-                        return false;
-                    }
+                    const isAllowed = allowedIds.some(allowedId => String(allowedId) === String(def.id));
+                    if (!isAllowed) return false;
                 }
             }
 
@@ -2218,6 +2238,15 @@ class RelicEditor {
         this.renderInspector(); // Refresh inspector to update button states
     }
 
+    toggleSearchRestrictions(checkbox) {
+        this.restrictSearch = checkbox.checked;
+        // No need to renderInspector, but if the modal is open, we should refresh it
+        const modal = document.getElementById('affixModal');
+        if (modal && modal.style.display !== 'none') {
+            this.filterAffixes();
+        }
+    }
+
     hasReachedAffixLimit(relicItem, type) {
         if (!this.restrictAffixes) return false;
 
@@ -2245,14 +2274,17 @@ class RelicEditor {
         return currentCount >= limit;
     }
 
-    getAllowedAffixIds(relicBaseId, type) {
-        const def = this.definitions.relics[relicBaseId];
-        if (!def) return [];
+    getAllowedAffixIds(relicDefId, type) {
+        const def = this.definitions.relics[relicDefId];
+        if (!def) return []; 
 
+        // Correctly access the pool array based on the data structure
         const pool = (type === 'primary') ? def.primaryAffixPool : def.secondaryAffixPool;
         
-        // Map the pool objects to just their Affix IDs
-        return pool.map(entry => entry.value.id);
+        if (!pool || !Array.isArray(pool)) return [];
+
+        // Map the complex object structure { value: { id: 123 } } to a flat array of IDs [123]
+        return pool.map(entry => entry.value && entry.value.id).filter(id => id !== undefined);
     }
 
     addSpecificAffix(id) {
