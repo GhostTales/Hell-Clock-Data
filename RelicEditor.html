@@ -1100,11 +1100,26 @@ class RelicEditor {
             });
         }
 
-        // 2. IMPLICIT LIST (No Lock, Has Remove)
+        // 2. IMPLICIT LIST
+        const implicitCount = item._implicitAffixesData ? item._implicitAffixesData.length : 0;
+        
+        // Only enforce limit if restrictions are ON
+        const isImplicitFull = this.restrictAffixes && implicitCount >= 2;
+
         const btnImplicit = [{
             label: '+ Add Implicit',
-            onClick: () => this.addAffix(true)
+            disabled: isImplicitFull,
+            onClick: () => {
+                // Set context for the modal filter
+                this.activeAffixType = 'implicit'; 
+                
+                // Open the modal to pick the specific ID immediately
+                this.openAffixModal(null, (id) => {
+                    this.addAffix(true, id);
+                });
+            }
         }];
+        
         this.renderUnifiedAffixList(container, item._implicitAffixesData, {
             title: "Implicit Affixes",
             type: 'implicit',
@@ -1112,8 +1127,8 @@ class RelicEditor {
             level: currentLevel,
             isUnlocked,
             buttons: btnImplicit,
-            allowLock: false,  // Disable Lock
-            allowRemove: true  // Enable Remove
+            allowLock: false,
+            allowRemove: true
         });
 
         // 3. PRIMARY LIST (Has Lock, Has Remove)
@@ -1231,13 +1246,37 @@ class RelicEditor {
         const filterType = document.getElementById('affixFilterSelect').value; 
         const mapping = this.data.implicit_mapping || {};
 
-        // --- NEW: RESTRICTION LOGIC ---
+        /// --- RESTRICTION LOGIC ---
         let allowedIds = null;
+        let blockedCategories = []; // Used for Implicits
+
         if (this.restrictAffixes && this.activeAffixType && this.selectedRelicIndex !== -1) {
              const item = this.getSelectedItem();
              if (item) {
-                 // activeAffixType should be 'primary' or 'secondary'
-                 allowedIds = this.getAllowedAffixIds(item._relicBaseDefinitionID, this.activeAffixType);
+                 if (this.activeAffixType === 'implicit') {
+                     // IMPLICIT LOGIC
+                     const currentImplicits = item._implicitAffixesData || [];
+                     
+                     // Check what we already have
+                     let hasCorrupted = false;
+                     let hasType = false; // Fury, Faith, or Discipline
+
+                     currentImplicits.forEach(imp => {
+                         const cat = this.getAffixCategory(imp._relicAffixData._relicAffixDefinitionId);
+                         if (cat === 3) hasCorrupted = true;
+                         if (cat >= 0 && cat <= 2) hasType = true;
+                     });
+
+                     if (hasCorrupted) blockedCategories.push(3);
+                     if (hasType) {
+                         blockedCategories.push(0); // Fury
+                         blockedCategories.push(1); // Faith
+                         blockedCategories.push(2); // Discipline
+                     }
+                 } else {
+                     // PRIMARY / SECONDARY LOGIC
+                     allowedIds = this.getAllowedAffixIds(item._relicBaseDefinitionID, this.activeAffixType);
+                 }
              }
         }
         // ------------------------------
@@ -1250,8 +1289,20 @@ class RelicEditor {
             const id = String(opt.id);
 
             // --- NEW: POOL CHECK ---
-            if (allowedIds && !allowedIds.includes(def.id)) {
-                return false;
+            if (this.restrictAffixes && this.activeAffixType) {
+                if (this.activeAffixType === 'implicit') {
+                    // Check Implicit Rules
+                    const cat = this.getAffixCategory(def.id);
+                    // Filter out if category matches a blocked one
+                    if (blockedCategories.includes(cat)) return false;
+                    // Filter out if it's not a valid implicit category at all (optional, depending on if you want random stats allowed)
+                    if (cat === -1) return false; 
+                } else {
+                    // Check Primary/Secondary Pools
+                    if (allowedIds && !allowedIds.includes(def.id)) {
+                        return false;
+                    }
+                }
             }
 
             // --- EXISTING FILTER CHECK ---
@@ -1913,14 +1964,15 @@ class RelicEditor {
         }
     }
 
-    addAffix(isImplicit) {
+    addAffix(isImplicit, specificId = 0) {
         const item = this.getSelectedItem();
         if (!item) return;
         
-        // Default new affix template
-        // We use ID 0 as a placeholder (user can change it via dropdown)
+        // Use specificId if provided, otherwise default to 0
+        const idToUse = specificId !== undefined ? parseInt(specificId) : 0;
+
         const newAffix = {
-            _relicAffixDefinitionId: 0, 
+            _relicAffixDefinitionId: idToUse, 
             _rollValue: 0.5,
             _locked: false,
             _tier: item._tier || 1
@@ -1928,7 +1980,13 @@ class RelicEditor {
 
         if (isImplicit) {
             if (!item._implicitAffixesData) item._implicitAffixesData = [];
-            // Implicit affixes are wrapped in a container object
+            
+            // Check implicit limit ONLY if restrictions are ON
+            if (this.restrictAffixes && item._implicitAffixesData.length >= 2) {
+                alert("Implicit limit reached (Max 2).");
+                return;
+            }
+
             item._implicitAffixesData.push({ _relicAffixData: newAffix });
         } else {
             if (!item._affixesData) item._affixesData = [];
@@ -2219,6 +2277,29 @@ class RelicEditor {
             return undefined; // Block dangerous keys
         }
         return value;
+    }
+
+    getAffixCategory(defId) {
+        const mapping = this.data.implicit_mapping || {};
+        const def = this.definitions.affixes[defId];
+        if (!def) return -1;
+
+        // Check explicit mapping (Fury=0, Faith=1, Discipline=2, Corrupted=3)
+        const mapId = mapping[defId];
+        
+        // If mapped to 0, 1, or 2, return immediately
+        if (mapId !== undefined && mapId !== 3) return mapId;
+
+        // Check for calculated Corrupted (Type 3)
+        // Corrupted = Fixed Range AND NOT Unique/Special
+        const isUnique = def.eAffixRarity === 'Unique';
+        const isSpecial = def.eAffixRarity === 'Special';
+        const hasFixedRange = def.tierRollRanges && def.tierRollRanges.some(t => t.rollRange && t.rollRange[0] === t.rollRange[1]);
+
+        if (hasFixedRange && !isUnique && !isSpecial) return 3;
+
+        // Fallback to mapping if it was 3, or -1
+        return mapId !== undefined ? mapId : -1;
     }
 
 }
