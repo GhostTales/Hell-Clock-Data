@@ -986,7 +986,7 @@ class RelicEditor {
         // --- 2. STATS GRID (Level, Tier, Rarity) ---
         const statsGrid = document.createElement('div');
         statsGrid.style.display = 'grid';
-        statsGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'; // 3 Equal Columns
+        statsGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'; 
         statsGrid.style.gap = '10px';
         statsGrid.style.marginBottom = '12px';
         
@@ -1045,14 +1045,14 @@ class RelicEditor {
 
         container.appendChild(statsGrid);
 
-        // --- 3. UNLOCK TOGGLE (Moved Bottom) ---
+        // --- 3. UNLOCK TOGGLE ---
         const hasHighRolls = (item._affixesData && item._affixesData.some(a => a._rollValue > 1.0)) || 
                              (item._implicitAffixesData && item._implicitAffixesData.some(i => i._relicAffixData._rollValue > 1.0));
         const isUnlocked = (this.ui_unlockLimits !== undefined) ? this.ui_unlockLimits : hasHighRolls;
 
         const unlockDiv = document.createElement('div');
         unlockDiv.style.marginBottom = '16px';
-        unlockDiv.style.borderBottom = '1px solid var(--border-color)'; // Separator line
+        unlockDiv.style.borderBottom = '1px solid var(--border-color)'; 
         unlockDiv.style.paddingBottom = '12px';
 
         const unlockLabel = document.createElement('label');
@@ -1101,34 +1101,42 @@ class RelicEditor {
         const isPriFull = this.hasReachedAffixLimit(item, 'primary');
         const isSecFull = this.hasReachedAffixLimit(item, 'secondary');
 
-        // 1. UNIQUE / RARE LIST (No Lock, No Remove)
-        if (uniqueList.length > 0) {
-            this.renderUnifiedAffixList(container, uniqueList, {
-                title: "Unique & Rare",
-                type: 'none',
-                tier: currentTier,
-                level: currentLevel,
-                isUnlocked,
-                buttons: [],
-                allowLock: false,   // Disable Lock
-                allowRemove: false  // Disable Remove
-            });
-        }
+        // --- UPDATED LOGIC: SHARED LIMIT FOR UNIQUE & RARE ---
+        // Since 'uniqueList' contains both Unique and Rare affixes, 
+        // if it has ANY entries (length > 0), the slot is taken.
+        // This ensures if a relic has a Unique, you cannot add a Rare.
+        const isUniqueOrRareFull = uniqueList.length > 0;
+
+        // 1. UNIQUE / RARE LIST
+        const btnRare = [{
+            label: '+ Add Rare',
+            disabled: isUniqueOrRareFull, // Disable button if slot is occupied
+            onClick: () => {
+                this.activeAffixType = 'rare'; 
+                this.openAffixModal(null, (id) => this.addSpecificAffix(id));
+            }
+        }];
+
+        this.renderUnifiedAffixList(container, uniqueList, {
+            title: "Unique & Rare",
+            type: 'none',
+            tier: currentTier,
+            level: currentLevel,
+            isUnlocked,
+            buttons: btnRare,   
+            allowLock: false,   
+            allowRemove: true   
+        });
 
         // 2. IMPLICIT LIST
         const implicitCount = item._implicitAffixesData ? item._implicitAffixesData.length : 0;
-        
-        // Only enforce limit if restrictions are ON
         const isImplicitFull = this.restrictAffixes && implicitCount >= 2;
 
         const btnImplicit = [{
             label: '+ Add Implicit',
             disabled: isImplicitFull,
             onClick: () => {
-                // Set context for the modal filter
                 this.activeAffixType = 'implicit'; 
-                
-                // Open the modal to pick the specific ID immediately
                 this.openAffixModal(null, (id) => {
                     this.addAffix(true, id);
                 });
@@ -1146,7 +1154,7 @@ class RelicEditor {
             allowRemove: true
         });
 
-        // 3. PRIMARY LIST (Has Lock, Has Remove)
+        // 3. PRIMARY LIST
         const btnPrimary = [{
             label: '+ Add Primary',
             disabled: isPriFull,
@@ -1162,11 +1170,11 @@ class RelicEditor {
             level: currentLevel,
             isUnlocked,
             buttons: btnPrimary,
-            allowLock: true,   // Enable Lock
-            allowRemove: true  // Enable Remove
+            allowLock: true,   
+            allowRemove: true  
         });
 
-        // 4. SECONDARY LIST (Has Lock, Has Remove)
+        // 4. SECONDARY LIST
         const btnSecondary = [{
             label: '+ Add Secondary',
             disabled: isSecFull,
@@ -1182,8 +1190,8 @@ class RelicEditor {
             level: currentLevel,
             isUnlocked,
             buttons: btnSecondary,
-            allowLock: true,   // Enable Lock
-            allowRemove: true  // Enable Remove
+            allowLock: true,   
+            allowRemove: true  
         });
     }
 
