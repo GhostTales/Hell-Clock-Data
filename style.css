@@ -623,6 +623,9 @@ button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed
 }
 
 .search-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 10px 15px;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
@@ -642,6 +645,23 @@ button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed
 
 .search-item small {
     color: var(--text-muted);
+}
+
+.search-item-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.search-item-right {
+    text-align: right;
+    font-family: monospace;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    white-space: nowrap; 
+    margin-left: 15px;
 }
 
 .btn-close {
@@ -770,6 +790,9 @@ button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed
 .tag-fury { color: #e5534b; border-color: rgba(229, 83, 75, 0.4); background: rgba(229, 83, 75, 0.1); }
 .tag-faith { color: #58a6ff; border-color: rgba(88, 166, 255, 0.4); background: rgba(88, 166, 255, 0.1); }
 .tag-discipline { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.1); }
+.tag-primary { color: #a5d6ff; border-color: rgba(56, 139, 253, 0.4); background: rgba(56, 139, 253, 0.1); }
+.tag-secondary { color: #c9d1d9; border-color: rgba(139, 148, 158, 0.4); background: rgba(139, 148, 158, 0.1); }
+.tag-unavailable { color: #8b949e; border-color: rgba(139, 148, 158, 0.4); background: rgba(110, 118, 129, 0.1); font-style: italic; }
 
 /* --- Splash Overlay Styling --- */
 .upload-overlay {

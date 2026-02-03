@@ -46,7 +46,7 @@
                     <input type="checkbox" id="chk-restrict" checked onchange="app.toggleRestrictions(this)">
                 </label>
                 <p style="font-size: 0.75em; color: #8b949e; margin: 4px 0 0 0;">
-                    Enforce affix limits and pools.
+                    Enforce affix limits.
                 </p>
             </div>
 
@@ -56,7 +56,7 @@
                     <input type="checkbox" id="chk-search-restrict" checked onchange="app.toggleSearchRestrictions(this)">
                 </label>
                 <p style="font-size: 0.75em; color: #8b949e; margin: 4px 0 0 0;">
-                    Filter modal to valid pools only.
+                    Filter affixes to valid pools only.
                 </p>
             </div>
         </div>
@@ -1272,49 +1272,29 @@ class RelicEditor {
 
         // --- RESTRICTION LOGIC ---
         let allowedIds = []; 
-        let blockedCategories = []; 
-        let strictSwapCategories = null;
+        let itemHasType = false;      // Slot 1: Fury/Faith/Discipline
+        let itemHasCorrupted = false; // Slot 2: Corrupted
 
+        // 1. ANALYZE CURRENT ITEM STATE
         if (this.restrictSearch && this.activeAffixType && this.selectedRelicIndex !== -1) {
              const item = this.getSelectedItem();
              if (item) {
                  if (this.activeAffixType === 'implicit') {
-                     // IMPLICIT LOGIC
-                     // 1. Swap Constraints
-                     if (this.editingAffixId) {
-                         const srcCat = this.getAffixCategory(this.editingAffixId);
-                         if (srcCat >= 0 && srcCat <= 2) {
-                             strictSwapCategories = [0, 1, 2];
-                         } else if (srcCat === 3) {
-                             strictSwapCategories = [3];
-                         }
-                     }
-
-                     // 2. Block Categories
                      const currentImplicits = item._implicitAffixesData || [];
-                     let hasCorrupted = false;
-                     let hasType = false; 
-
+                     
                      currentImplicits.forEach(imp => {
                          const impId = imp._relicAffixData._relicAffixDefinitionId;
+                         // Ignore the affix we are currently replacing
                          if (this.editingAffixId && String(impId) === String(this.editingAffixId)) return; 
 
-                         const cat = this.getAffixCategory(impId);
-                         if (cat === 3) hasCorrupted = true;
-                         if (cat >= 0 && cat <= 2) hasType = true;
+                         const impCats = this.getAffixCategory(impId);
+                         
+                         if (impCats.some(c => c >= 0 && c <= 2)) itemHasType = true;
+                         if (impCats.includes(3)) itemHasCorrupted = true;
                      });
-
-                     if (hasCorrupted) blockedCategories.push(3);
-                     if (hasType) {
-                         blockedCategories.push(0); 
-                         blockedCategories.push(1); 
-                         blockedCategories.push(2); 
-                     }
                  } else if (this.activeAffixType === 'rare') {
-                     // RARE LOGIC: No pool to fetch, handled by rarity property
                      allowedIds = []; 
                  } else {
-                     // PRIMARY / SECONDARY LOGIC
                      const list = this.getAllowedAffixIds(item._relicBaseDefinitionID, this.activeAffixType);
                      allowedIds = list || []; 
                  }
@@ -1328,25 +1308,45 @@ class RelicEditor {
             const name = opt.name.toLowerCase();
             const id = String(opt.id);
 
-            // Users should not be able to select Unique affixes manually
             if (def.eAffixRarity === 'Unique') return false;
 
             // --- POOL / RESTRICTION CHECK ---
             if (this.restrictSearch && this.activeAffixType) {
                 if (this.activeAffixType === 'implicit') {
-                    // Implicit Logic
-                    const cat = this.getAffixCategory(def.id);
-                    if (cat === -1) return false;
-                    if (strictSwapCategories !== null && !strictSwapCategories.includes(cat)) return false;
-                    if (blockedCategories.includes(cat)) return false;
+                    // Get Categories (Array)
+                    const candCats = this.getAffixCategory(def.id);
+                    
+                    // Invalid if no category found
+                    if (candCats.length === 0) return false;
+
+                    const candHasType = candCats.some(c => c >= 0 && c <= 2);
+                    const candHasCorrupted = candCats.includes(3);
+
+                    // A. Check Slot Availability
+                    // If item already has a Type affix, we can't add another Type affix
+                    if (itemHasType && candHasType) return false;
+                    // If item already has a Corrupted affix, we can't add another Corrupted affix
+                    if (itemHasCorrupted && candHasCorrupted) return false;
+
+                    // B. Strict Swap Logic (Preserve Slot Type)
+                    if (this.editingAffixId) {
+                        const srcCats = this.getAffixCategory(this.editingAffixId);
+                        const srcIsType = srcCats.some(c => c >= 0 && c <= 2);
+                        const srcIsCorrupted = srcCats.includes(3);
+
+                        // If replacing a Type, new affix MUST be a Type
+                        if (srcIsType && !srcIsCorrupted) {
+                            if (!candHasType) return false;
+                        }
+                        // If replacing a Corrupted, new affix MUST be Corrupted
+                        if (srcIsCorrupted && !srcIsType) {
+                            if (!candHasCorrupted) return false;
+                        }
+                    }
 
                 } else if (this.activeAffixType === 'rare') {
-                    // NEW: RARE LOGIC
-                    // Strictly only show Special rarity affixes
                     if (def.eAffixRarity !== 'Special') return false;
-
                 } else {
-                    // Primary/Secondary Logic
                     const isAllowed = allowedIds.some(allowedId => String(allowedId) === String(def.id));
                     if (!isAllowed) return false;
                 }
@@ -1359,20 +1359,17 @@ class RelicEditor {
                 const isSpecial = def.eAffixRarity === 'Special';
                 const isFixedRange = def.tierRollRanges && def.tierRollRanges.some(t => t.rollRange && t.rollRange[0] === t.rollRange[1]);
                 
-                const mapId = mapping[def.id];
-                const isSpecificType = mapId !== undefined && mapId !== 3;
-
-                const isCorrupted = isFixedRange && !isUnique && !isSpecial && !isSpecificType;
+                const candCats = this.getAffixCategory(def.id); // Array check for filter
                 
                 switch (filterType) {
                     case 'unique': typeMatch = isUnique; break;
                     case 'rare': typeMatch = isSpecial; break;
-                    case 'corrupted': typeMatch = isCorrupted; break;
-                    case 'fury': typeMatch = (mapId === 0); break;
-                    case 'faith': typeMatch = (mapId === 1); break;
-                    case 'discipline': typeMatch = (mapId === 2); break;
+                    case 'corrupted': typeMatch = candCats.includes(3); break;
+                    case 'fury': typeMatch = candCats.includes(0); break;
+                    case 'faith': typeMatch = candCats.includes(1); break;
+                    case 'discipline': typeMatch = candCats.includes(2); break;
                     case 'none': 
-                        typeMatch = !isUnique && !isSpecial && !isCorrupted && !isSpecificType;
+                        typeMatch = !isUnique && !isSpecial && candCats.length === 0;
                         break;
                 }
             }
@@ -1421,12 +1418,39 @@ class RelicEditor {
         const container = document.getElementById('affixSearchResults');
         container.innerHTML = '';
         
+        // --- EMPTY STATE LOGIC ---
         if (items.length === 0) {
-            container.innerHTML = '<div style="padding:10px; color:#666;">No affixes found.</div>';
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; gap: 10px; align-items: center;';
+
+            if (this.restrictSearch) {
+                wrapper.innerHTML = `
+                    <div style="font-size: 0.9em;">
+                        <strong style="display:block; color: var(--text-color); margin-bottom: 5px;">No valid affixes found.</strong>
+                        The current slot or item limits prevent adding more affixes of this type.
+                    </div>
+                    <div style="font-size: 0.8em; color: #d29922; border: 1px solid rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.1); padding: 8px; border-radius: 4px; max-width: 280px;">
+                        <strong>Warning:</strong> Disabling search restrictions allows you to add <em>any</em> affix, but may result in illegal relics.
+                    </div>
+                `;
+                const btn = document.createElement('button');
+                btn.textContent = "Disable Search Restrictions";
+                btn.className = "btn-add"; 
+                btn.style.cssText = "width: auto; margin-top: 5px; background-color: #21262d; border-color: var(--border-color); color: var(--text-color);";
+                btn.onclick = () => {
+                    const chk = document.getElementById('chk-search-restrict');
+                    if (chk) {
+                        chk.checked = false;
+                        this.toggleSearchRestrictions(chk); 
+                    }
+                };
+                wrapper.appendChild(btn);
+            } else {
+                wrapper.textContent = 'No affixes found matching your search.';
+            }
+            container.appendChild(wrapper);
             return;
         }
-
-        const mapping = this.data.implicit_mapping || {};
 
         items.forEach(item => {
             const def = item.rawDef;
@@ -1435,46 +1459,48 @@ class RelicEditor {
 
             // --- 1. BUILD TAGS ---
             let tagsHtml = '';
+            
+            // A. Primary / Secondary
+            const poolInfo = this.affixPoolMap ? this.affixPoolMap[def.id] : null;
+            if (poolInfo) {
+                if (poolInfo.primary) tagsHtml += `<span class="tag-badge tag-primary">Primary</span>`;
+                if (poolInfo.secondary) tagsHtml += `<span class="tag-badge tag-secondary">Secondary</span>`;
+            }
+
+            // B. Rarity
             const isUnique = def.eAffixRarity === 'Unique';
             const isSpecial = def.eAffixRarity === 'Special';
+            if (isUnique) tagsHtml += `<span class="tag-badge tag-unique">Unique</span>`;
+            else if (isSpecial) tagsHtml += `<span class="tag-badge tag-rare">Rare</span>`;
+
+            // C. Implicit Mapping
+            const cats = this.getAffixCategory(def.id);
             
-            // Check if mapped to specific types (0=Fury, 1=Faith, 2=Discipline)
-            // Type 3 is "Corrupted", so we exclude it here to handle it in the generic corrupted check later
-            const mapId = mapping[def.id];
-            const isSpecificType = mapId !== undefined && mapId !== 3;
+            cats.forEach(catId => {
+                if (catId === 3) return; 
 
-            // A. Check Rarity
-            if (isUnique) {
-                tagsHtml += `<span class="tag-badge tag-unique">Unique</span>`;
-            } else if (isSpecial) {
-                tagsHtml += `<span class="tag-badge tag-rare">Rare</span>`;
-            }
-
-            // B. Check Implicit Mapping (Fury/Faith/Discipline)
-            if (isSpecificType) {
-                let catName = this.getImplicitCategoryName(mapId);
-                let catClass = `tag-${catName.toLowerCase()}`;
+                const catName = this.getImplicitCategoryName(catId);
+                const catClass = `tag-${catName.toLowerCase()}`;
                 tagsHtml += `<span class="tag-badge ${catClass}">${catName}</span>`;
-            }
+            });
 
-            // C. Check Corrupted (Fixed Range)
-            const isFixedRange = def.tierRollRanges && def.tierRollRanges.some(t => t.rollRange && t.rollRange[0] === t.rollRange[1]);
-            
-            // Logic: 
-            // 1. Must be Fixed Range
-            // 2. Must NOT be Unique or Special
-            // 3. Must NOT be already tagged as Fury/Faith/Discipline (isSpecificType)
-            // Note: If mapId === 3 (Explicit Corrupted), isSpecificType is false, so it passes this check.
-            if (isFixedRange && !isUnique && !isSpecial && !isSpecificType) {
+            // D. Corrupted
+            if (cats.includes(3)) {
                  tagsHtml += `<span class="tag-badge tag-corrupted">Corrupted</span>`;
             }
 
-            // --- 2. RENDER ---
+            // E. Not Attainable (Fallback)
+            // If the affix has no tags yet, it means it's not in any pool, not unique/rare, and not an implicit.
+            if (tagsHtml === '') {
+                tagsHtml += `<span class="tag-badge tag-unavailable">Not Attainable</span>`;
+            }
+
+            // --- 2. RENDER LEFT (Name + Tags) ---
             const leftDiv = document.createElement('div');
             leftDiv.className = 'search-item-left';
 
             const strong = document.createElement('strong');
-            strong.textContent = item.name; // Secure
+            strong.textContent = item.name; 
 
             const tagContainer = document.createElement('div');
             tagContainer.className = 'tag-container';
@@ -1482,7 +1508,14 @@ class RelicEditor {
 
             leftDiv.appendChild(strong);
             leftDiv.appendChild(tagContainer);
+
+            // --- 3. RENDER RIGHT (ID) ---
+            const rightDiv = document.createElement('div');
+            rightDiv.className = 'search-item-right';
+            rightDiv.textContent = `#${def.id}`;
+
             div.appendChild(leftDiv);
+            div.appendChild(rightDiv);
             
             div.onclick = () => {
                 if (this.pendingAffixCallback) {
@@ -1542,7 +1575,9 @@ class RelicEditor {
 
         items.forEach((itemWrapper, loopIndex) => {
             let affixData, originalIndex;
-            let catColor = null, catName = null;
+            
+            // Define colors map
+            const catColors = { 0: '#e5534b', 1: '#58a6ff', 2: '#3fb950', 3: '#a371f7', [-1]: '#888888' };
 
             if (isImplicit) {
                 if (loopIndex === 3) {
@@ -1551,36 +1586,8 @@ class RelicEditor {
                     limitWarning.textContent = '--- GAME DISPLAY LIMIT (TOP 3 SHOWN) ---';
                     list.appendChild(limitWarning);
                 }
-
                 affixData = itemWrapper._relicAffixData;
                 originalIndex = loopIndex;
-
-                const mapping = this.data.implicit_mapping || {};
-                const defId = affixData._relicAffixDefinitionId;
-                const def = this.definitions.affixes[defId];
-                const range = this.getAffixRange(defId, tier);
-                
-                const mapId = mapping[defId];
-                const isSpecificType = mapId !== undefined && mapId !== 3;
-                const isUnique = def && def.eAffixRarity === 'Unique';
-                const isSpecial = def && def.eAffixRarity === 'Special';
-                const isFixedRange = range && range[0] === range[1];
-
-                let calculatedCat = -1;
-                if (isSpecificType) calculatedCat = mapId;
-                else if (isFixedRange && !isUnique && !isSpecial) calculatedCat = 3; 
-                else if (mapId !== undefined) calculatedCat = mapId;
-
-                if (itemWrapper._eImplicitAffixCategory === undefined || 
-                    itemWrapper._eImplicitAffixCategory === null || 
-                    (itemWrapper._eImplicitAffixCategory === 3 && isSpecificType)) {
-                    itemWrapper._eImplicitAffixCategory = calculatedCat;
-                }
-
-                const catId = itemWrapper._eImplicitAffixCategory;
-                catName = this.getImplicitCategoryName(catId);
-                const catColors = { 0: '#e5534b', 1: '#58a6ff', 2: '#3fb950', 3: '#a371f7', [-1]: '#888888' };
-                catColor = catColors[catId] || '#888888';
             } else {
                 affixData = itemWrapper.affix;
                 originalIndex = itemWrapper.index;
@@ -1594,9 +1601,76 @@ class RelicEditor {
             const div = document.createElement('div');
             div.className = 'affix-item';
             
+            // --- IMPLICIT VISUALS (Sharper Gradient & Colors) ---
+            let typeLabelContainer = null;
+            
             if (isImplicit) {
-                div.style.borderLeft = `3px solid ${catColor}`;
                 if (loopIndex >= 3) div.style.opacity = '0.6';
+
+                const cats = this.getAffixCategory(defId);
+                const colors = cats.map(c => catColors[c] || catColors[-1]);
+                
+                // 1. Left Border Logic
+                if (colors.length > 1) {
+                    // NEW: Sharp Blend Logic
+                    // We generate stops to keep colors solid for most of their segment, 
+                    // blending only in a small buffer zone (e.g. 6%) around the transitions.
+                    const step = 100 / colors.length;
+                    const blendBuffer = 6; // +/- 6% blend zone (12% total transition width)
+                    
+                    let stops = [];
+                    colors.forEach((col, i) => {
+                        const isFirst = (i === 0);
+                        const isLast = (i === colors.length - 1);
+                        
+                        const segmentStart = i * step;
+                        const segmentEnd = (i + 1) * step;
+
+                        if (isFirst) {
+                            stops.push(`${col} 0%`);
+                            stops.push(`${col} ${segmentEnd - blendBuffer}%`);
+                        } else if (isLast) {
+                            stops.push(`${col} ${segmentStart + blendBuffer}%`);
+                            stops.push(`${col} 100%`);
+                        } else {
+                            stops.push(`${col} ${segmentStart + blendBuffer}%`);
+                            stops.push(`${col} ${segmentEnd - blendBuffer}%`);
+                        }
+                    });
+
+                    div.style.borderLeft = '3px solid transparent';
+                    div.style.background = `linear-gradient(to bottom, ${stops.join(', ')}) no-repeat border-box left/3px 100%, var(--bg-color)`;
+
+                } else if (colors.length === 1) {
+                    div.style.borderLeft = `3px solid ${colors[0]}`;
+                } else {
+                    div.style.borderLeft = `3px solid ${catColors[-1]}`;
+                }
+
+                // 2. Type Label Construction (Multi-colored)
+                typeLabelContainer = document.createElement('div');
+                typeLabelContainer.style.cssText = 'font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom: 2px; line-height: 1;';
+                
+                if (cats.length > 0) {
+                    cats.forEach((c, i) => {
+                        const span = document.createElement('span');
+                        span.textContent = this.getImplicitCategoryName(c);
+                        span.style.color = catColors[c] || catColors[-1];
+                        typeLabelContainer.appendChild(span);
+
+                        if (i < cats.length - 1) {
+                            const divider = document.createElement('span');
+                            divider.textContent = ' / ';
+                            divider.style.color = 'var(--text-muted)';
+                            typeLabelContainer.appendChild(divider);
+                        }
+                    });
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = "UNKNOWN";
+                    span.style.color = catColors[-1];
+                    typeLabelContainer.appendChild(span);
+                }
             }
 
             const header = document.createElement('div');
@@ -1605,68 +1679,44 @@ class RelicEditor {
             const nameGroup = document.createElement('div');
             nameGroup.className = 'affix-name-group';
 
-            const topRowName = document.createElement('div');
-            if (isImplicit) {
-                topRowName.style.cssText = 'display:flex; align-items:center; gap:8px;';
-                const catLabel = document.createElement('span');
-                catLabel.textContent = catName;
-                catLabel.style.cssText = `color:${catColor}; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;`;
-                topRowName.appendChild(catLabel);
+            // --- APPEND TYPE LABEL (Row 1) ---
+            if (isImplicit && typeLabelContainer) {
+                nameGroup.appendChild(typeLabelContainer);
             }
 
-            // --- NAME BUTTON LOGIC (MODIFIED) ---
-            const isStrictlyUnique = def && def.eAffixRarity === 'Unique';
-            const isRare = def && def.eAffixRarity === 'Special';
-            
+            // --- AFFIX NAME BUTTON (Row 2) ---
             const nameBtn = document.createElement('button');
             nameBtn.className = 'affix-name-btn';
             nameBtn.textContent = this.getAffixName(defId);
+            
+            const isStrictlyUnique = def && def.eAffixRarity === 'Unique';
+            const isRare = def && def.eAffixRarity === 'Special';
 
             if (isStrictlyUnique) {
-                // LOCK UNIQUE AFFIXES: No clicking allowed
                 nameBtn.disabled = true;
                 nameBtn.style.cursor = 'default';
                 nameBtn.title = "Unique affixes cannot be changed";
             } else {
                 nameBtn.title = "Click to change affix";
                 nameBtn.onclick = () => {
-                    // --- DYNAMICALLY DETERMINE CONTEXT ---
-                    // If the item is Rare, force mode to 'rare', otherwise use the list's default type
                     let contextType = type;
                     if (isRare) contextType = 'rare';
 
                     this.activeAffixType = contextType; 
-
+                    
                     this.openAffixModal(defId, (newId) => {
                         const parsedId = parseInt(newId);
                         affixData._relicAffixDefinitionId = parsedId;
                         if (isImplicit) {
-                            const mapping = this.data.implicit_mapping || {};
-                            const newDef = this.definitions.affixes[parsedId];
-                            const newMapId = mapping[parsedId];
-                            const newRange = this.getAffixRange(parsedId, tier);
-                            const nSpec = newMapId !== undefined && newMapId !== 3;
-                            const nUnq = newDef && newDef.eAffixRarity === 'Unique';
-                            const nRare = newDef && newDef.eAffixRarity === 'Special';
-                            const nFixed = newRange && newRange[0] === newRange[1];
-                            if (nSpec) itemWrapper._eImplicitAffixCategory = newMapId;
-                            else if (nFixed && !nUnq && !nRare) itemWrapper._eImplicitAffixCategory = 3;
-                            else if (newMapId !== undefined) itemWrapper._eImplicitAffixCategory = newMapId;
-                            else itemWrapper._eImplicitAffixCategory = -1;
+                             itemWrapper._eImplicitAffixCategory = null; 
                         }
                         this.renderInspector();
                     });
                 };
             }
+            nameGroup.appendChild(nameBtn);
 
-            if (isImplicit) {
-                topRowName.appendChild(nameBtn);
-                nameGroup.appendChild(topRowName);
-            } else {
-                nameGroup.appendChild(nameBtn);
-            }
-
-            // Meta Row
+            // --- META ROW (Row 3: Tags & Range) ---
             const metaRow = document.createElement('div');
             metaRow.className = 'affix-meta-row';
 
@@ -1700,7 +1750,7 @@ class RelicEditor {
             metaRow.appendChild(tagsDiv);
             nameGroup.appendChild(metaRow);
 
-            // Right Side
+            // --- RIGHT SIDE (Value & Lock) ---
             const rightGroup = document.createElement('div');
             rightGroup.className = 'affix-right-group';
 
@@ -1709,7 +1759,6 @@ class RelicEditor {
             calcVal.textContent = this.calculateRealValue(affixData._rollValue, range, level, def);
             rightGroup.appendChild(calcVal);
 
-            // Lock Checkbox
             if (allowLock) {
                 const lockLabel = document.createElement('label');
                 lockLabel.className = 'lock-label';
@@ -1722,7 +1771,7 @@ class RelicEditor {
             header.appendChild(rightGroup);
             div.appendChild(header);
 
-            // Controls
+            // --- CONTROLS ---
             const controls = document.createElement('div');
             controls.className = 'affix-controls';
 
@@ -2348,24 +2397,73 @@ class RelicEditor {
     getAffixCategory(defId) {
         const mapping = this.data.implicit_mapping || {};
         const def = this.definitions.affixes[defId];
-        if (!def) return -1;
+        if (!def) return [];
 
-        // Check explicit mapping (Fury=0, Faith=1, Discipline=2, Corrupted=3)
-        const mapId = mapping[defId];
-        
-        // If mapped to 0, 1, or 2, return immediately
-        if (mapId !== undefined && mapId !== 3) return mapId;
+        let cats = [];
+        const rawMap = mapping[defId];
 
-        // Check for calculated Corrupted (Type 3)
+        // Handle Array or Single Value from mapping
+        if (Array.isArray(rawMap)) {
+            cats = [...rawMap];
+        } else if (rawMap !== undefined && rawMap !== null) {
+            cats = [rawMap];
+        }
+
+        // Check for Corrupted (Type 3) if not explicitly mapped
         // Corrupted = Fixed Range AND NOT Unique/Special
-        const isUnique = def.eAffixRarity === 'Unique';
-        const isSpecial = def.eAffixRarity === 'Special';
-        const hasFixedRange = def.tierRollRanges && def.tierRollRanges.some(t => t.rollRange && t.rollRange[0] === t.rollRange[1]);
+        if (cats.length === 0) {
+            const isUnique = def.eAffixRarity === 'Unique';
+            const isSpecial = def.eAffixRarity === 'Special';
+            const hasFixedRange = def.tierRollRanges && def.tierRollRanges.some(t => t.rollRange && t.rollRange[0] === t.rollRange[1]);
+            
+            if (hasFixedRange && !isUnique && !isSpecial) {
+                cats.push(3);
+            }
+        }
+        
+        return cats;
+    }
 
-        if (hasFixedRange && !isUnique && !isSpecial) return 3;
+    processDefinitions() {
+        if (this.data.relics && this.data.relics.Relics) {
+            this.data.relics.Relics.forEach(r => this.definitions.relics[r.id] = r);
+        }
+        
+        if (this.data.affixes && this.data.affixes["Relic Affixes"]) {
+            this.data.affixes["Relic Affixes"].forEach(a => this.definitions.affixes[a.id] = a);
+        }
 
-        // Fallback to mapping if it was 3, or -1
-        return mapId !== undefined ? mapId : -1;
+        // Capture Global Default Config
+        if (this.data.affixes && this.data.affixes.relicUpgradeModifierConfig) {
+            this.definitions.defaultUpgradeModifiers = this.data.affixes.relicUpgradeModifierConfig.upgradeModifier;
+        }
+
+        // --- NEW: Build Affix Pool Map (Primary vs Secondary) ---
+        this.affixPoolMap = {}; // { id: { primary: bool, secondary: bool } }
+        
+        Object.values(this.definitions.relics).forEach(relic => {
+            // Check Primary Pool
+            if (relic.primaryAffixPool) {
+                relic.primaryAffixPool.forEach(entry => {
+                    // Pool structure is usually [{ value: { id: 123 } }, ...]
+                    const id = entry.value ? entry.value.id : null;
+                    if (id) {
+                        if (!this.affixPoolMap[id]) this.affixPoolMap[id] = { primary: false, secondary: false };
+                        this.affixPoolMap[id].primary = true;
+                    }
+                });
+            }
+            // Check Secondary Pool
+            if (relic.secondaryAffixPool) {
+                relic.secondaryAffixPool.forEach(entry => {
+                    const id = entry.value ? entry.value.id : null;
+                    if (id) {
+                        if (!this.affixPoolMap[id]) this.affixPoolMap[id] = { primary: false, secondary: false };
+                        this.affixPoolMap[id].secondary = true;
+                    }
+                });
+            }
+        });
     }
 
 }
