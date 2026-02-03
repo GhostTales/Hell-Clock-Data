@@ -385,6 +385,13 @@ button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed
     text-decoration: underline;
 }
 
+.affix-name-btn:disabled {
+    background-color: transparent;
+    border: none;
+    color: var(--text-color);
+    cursor: default;
+}
+
 /* Container for Range + Tags on the left */
 .affix-meta-row {
     display: flex;
