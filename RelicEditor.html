@@ -1155,24 +1155,27 @@ class RelicEditor {
         });
 
         // 3. PRIMARY LIST
-        const btnPrimary = [{
-            label: '+ Add Primary',
-            disabled: isPriFull,
-            onClick: () => {
-                this.activeAffixType = 'primary';
-                this.openAffixModal(null, (id) => this.addSpecificAffix(id));
-            }
-        }];
-        this.renderUnifiedAffixList(container, primaryList, {
-            title: "Primary Affixes",
-            type: 'primary',
-            tier: currentTier,
-            level: currentLevel,
-            isUnlocked,
-            buttons: btnPrimary,
-            allowLock: true,   
-            allowRemove: true  
-        });
+        // Only render if restrictions are OFF, or if the list actually has items
+        if (!this.restrictAffixes || primaryList.length > 0) {
+            const btnPrimary = [{
+                label: '+ Add Primary',
+                disabled: isPriFull,
+                onClick: () => {
+                    this.activeAffixType = 'primary';
+                    this.openAffixModal(null, (id) => this.addSpecificAffix(id));
+                }
+            }];
+            this.renderUnifiedAffixList(container, primaryList, {
+                title: "Primary Affixes",
+                type: 'primary',
+                tier: currentTier,
+                level: currentLevel,
+                isUnlocked,
+                buttons: btnPrimary,
+                allowLock: true,   
+                allowRemove: true  
+            });
+        }
 
         // 4. SECONDARY LIST
         const btnSecondary = [{
