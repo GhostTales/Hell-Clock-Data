@@ -1887,8 +1887,8 @@ class RelicEditor {
         const filtered = this.data.relics.Relics.filter(r => {
             // 1. Generic Check: Does the name contain "_Tier4"?
             if (r.name.includes("_Tier4")) return true;
-            // 2. Check for Unique Relics (Respect canDrop)
-            if (r.type === "UniqueRelicBaseDefinition" && r.canDrop !== false) return true;
+            // 2. Check for Unique Relics (do not Respect canDrop)
+            if (r.type === "UniqueRelicBaseDefinition") return true;
             return false;
         });
 
