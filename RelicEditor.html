@@ -801,16 +801,10 @@ class RelicEditor {
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 
-            const realName = this.getRelicName(def, item._tier);
-            const displayName = this.formatRelicDisplay(realName);
-        
-            const strong = document.createElement('strong');
-            strong.textContent = displayName;
-            el.appendChild(strong);
+            this.renderRelicContent(el, def, item._tier);
             
             el.onmousedown = (e) => {
-                e.stopPropagation(); // Stop grid interaction
-                // Start Drag Logic
+                e.stopPropagation(); 
                 this.initDrag(e, item, index, el, 'main');
             };
 
@@ -829,22 +823,18 @@ class RelicEditor {
         const container = document.getElementById('stashContainer');
         container.innerHTML = '';
 
-        // 1. Set Grid Template using Fixed Size
         container.style.gridTemplateColumns = `repeat(${this.stashWidth}, ${this.stashCellSize}px)`;
         container.style.gridTemplateRows = `repeat(${this.stashHeight}, ${this.stashCellSize}px)`;
 
-        // Draw Background Slots
         const totalSlots = this.stashWidth * this.stashHeight;
         for(let i=0; i<totalSlots; i++) {
             const div = document.createElement('div');
             div.className = 'grid-slot';
-            // Force slots to fixed size
             div.style.width = `${this.stashCellSize}px`;
             div.style.height = `${this.stashCellSize}px`;
             container.appendChild(div);
         }
 
-        // Draw Items
         this.stashItems.forEach((item, index) => {
             const def = this.definitions.relics[item._relicBaseDefinitionID];
             const size = this.getRelicSize(def);
@@ -853,7 +843,6 @@ class RelicEditor {
             el.className = `relic-item rarity-${item._eRelicRarity}`;
             if (this.selectedContainer === 'stash' && index === this.selectedRelicIndex) el.classList.add('selected');
         
-            // 2. Use Fixed Size for Item Calculations
             const cellSize = this.stashCellSize;
             const gap = 4;
 
@@ -862,12 +851,8 @@ class RelicEditor {
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
         
-            const realName = this.getRelicName(def, item._tier);
-            const displayName = this.formatRelicDisplay(realName);
-        
-            const strong = document.createElement('strong');
-            strong.textContent = displayName;
-            el.appendChild(strong);
+            
+            this.renderRelicContent(el, def, item._tier);
 
             el.onmousedown = (e) => {
                 e.stopPropagation();
@@ -1986,33 +1971,27 @@ class RelicEditor {
     }
 
     createRelic(e, relicDefId) {
-        // 1. Close modal
         this.closeCreationModal();
 
         const def = this.definitions.relics[relicDefId];
         if (!def) return console.error("Relic definition not found");
 
-        // 2. Determine Stats based on Type
-        let targetTier = 4;     // Default to Tier 4
+        let targetTier = 4;     
         let targetRarity = 1;   
         let targetLevel = 0;    
 
         const tierMatch = def.name.match(/_Tier(\d+)/);
 
         if (tierMatch) {
-            // --- BASIC RELIC CONFIG ---
-            // Requirement: Default to Tier 4, Rarity 2 (Rare), Level 5
             targetTier = 4;
-            targetRarity = 2; // 0=Common, 1=Magic, 2=Rare, 3=Unique
+            targetRarity = 2; 
             targetLevel = 5;
         } else {
-            // --- UNIQUE RELIC CONFIG ---
             targetTier = 4; 
-            targetRarity = 3; // Unique Rarity
-            targetLevel = 5;  // Default level for uniques
+            targetRarity = 3; 
+            targetLevel = 5;  
         }
 
-        // 3. Create Instance
         const newRelic = {
             _relicBaseDefinitionID: def.id,
             _position: { x: 0, y: 0 }, 
@@ -2023,7 +2002,6 @@ class RelicEditor {
             _implicitAffixesData: []
         };
 
-        // Add Intrinsic Affixes (if any) as Normal Affixes
         if (def.intrinsicAffixes && Array.isArray(def.intrinsicAffixes)) {
             def.intrinsicAffixes.forEach(affixDef => {
                 newRelic._affixesData.push({
@@ -2035,25 +2013,19 @@ class RelicEditor {
             });
         }
 
-        // 4. Create Visual Element for Dragging
         const size = this.getRelicSize(def);
         
         const el = document.createElement('div');
         el.className = `relic-item rarity-${newRelic._eRelicRarity} dragging`;
         
-        const realName = this.getRelicName(def, newRelic._tier);
-        const displayName = this.formatRelicDisplay(realName);
-        
-        const strong = document.createElement('strong');
-        strong.textContent = displayName;
-        el.appendChild(strong);
+        // UPDATED: Use helper
+        this.renderRelicContent(el, def, newRelic._tier);
         
         const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         const gap = 4;
         el.style.width = `${size.w * currentCellSize + (size.w - 1) * gap}px`;
         el.style.height = `${size.h * currentCellSize + (size.h - 1) * gap}px`;
         
-        // Position at Cursor
         el.style.position = 'fixed';
         el.style.zIndex = 9999;
         el.style.left = `${e.clientX - (parseInt(el.style.width)/2)}px`; 
@@ -2062,7 +2034,6 @@ class RelicEditor {
 
         document.body.appendChild(el);
 
-        // 5. Initialize Drag
         this.initDrag(e, newRelic, -1, el, 'copy_mode');
         
         this.isDragging = true;
@@ -2303,49 +2274,34 @@ class RelicEditor {
     }
 
     startCopy(e, originalItem) {
-        // Prevent copying if already dragging something
         if (this.isDragging) return;
 
-        // 1. Deep Clone the Item Data
         const clone = JSON.parse(JSON.stringify(originalItem));
-        
-        // 2. Create a Visual Element for the Clone
         const def = this.definitions.relics[clone._relicBaseDefinitionID];
         const size = this.getRelicSize(def);
         
         const el = document.createElement('div');
         el.className = `relic-item rarity-${clone._eRelicRarity} dragging`;
-        const realName = this.getRelicName(def, clone._tier);
-        const displayName = this.formatRelicDisplay(realName);
         
-        const strong = document.createElement('strong');
-        strong.textContent = displayName;
-        el.appendChild(strong);
+        // UPDATED: Use helper
+        this.renderRelicContent(el, def, clone._tier);
         
-        // Size it correctly (use Main Grid size by default for visuals)
         const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         const gap = 4;
         el.style.width = `${size.w * currentCellSize + (size.w - 1) * gap}px`;
         el.style.height = `${size.h * currentCellSize + (size.h - 1) * gap}px`;
         
-        // 3. Position at Mouse
         el.style.position = 'fixed';
         el.style.zIndex = 9999;
-        // Center the item on the cursor
         el.style.left = `${e.clientX - (parseInt(el.style.width)/2)}px`; 
         el.style.top = `${e.clientY - (parseInt(el.style.height)/2)}px`;
         el.style.pointerEvents = 'none';
 
         document.body.appendChild(el);
 
-        // 4. Force Start Drag
-        // We pass 'copy_mode' as the source so attemptDrop knows not to delete the original
         this.initDrag(e, clone, -1, el, 'copy_mode');
-        
-        // Manually set isDragging to true since we skipped the threshold check
         this.isDragging = true;
         
-        // Manually set offsets so it centers on mouse
         const rect = el.getBoundingClientRect();
         this.dragOffsetX = e.clientX - rect.left;
         this.dragOffsetY = e.clientY - rect.top;
@@ -2512,6 +2468,47 @@ class RelicEditor {
                 });
             }
         });
+    }
+
+    renderRelicContent(container, def, tier) {
+        container.innerHTML = ''; // Clear previous content
+
+        // Determine the sprite name
+        let spriteName = def.sprite;
+
+        // Fallback: If no sprite key, use convention "IconRelic_{Size}{Tier}"
+        if (!spriteName && def.eRelicSize) {
+            const t = tier || 1;
+            spriteName = `IconRelic_${def.eRelicSize}${t}`;
+        }
+
+        if (spriteName) {
+            const img = document.createElement('img');
+            img.src = `icons/${spriteName}.png`;
+            img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
+            img.draggable = false;
+            
+            // Add tooltip so user can identify the item on hover
+            container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
+            
+            // Safety: Revert to text if the image file is missing
+            img.onerror = () => {
+                img.remove();
+                this.renderRelicTextFallback(container, def, tier);
+            };
+
+            container.appendChild(img);
+        } else {
+            this.renderRelicTextFallback(container, def, tier);
+        }
+    }
+
+    renderRelicTextFallback(container, def, tier) {
+        const realName = this.getRelicName(def, tier);
+        const displayName = this.formatRelicDisplay(realName);
+        const strong = document.createElement('strong');
+        strong.textContent = displayName;
+        container.appendChild(strong);
     }
 
 }
