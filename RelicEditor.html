@@ -1198,8 +1198,10 @@ class RelicEditor {
             allowRemove: true
         });
 
+
+        const maxPrimary = def.primaryAffixAmount ? def.primaryAffixAmount[1] : 0;
         // 3. PRIMARY LIST
-        if (!this.restrictAffixes || primaryList.length > 0) {
+        if (!this.restrictAffixes || maxPrimary > 0 || primaryList.length > 0) {
             const btnPrimary = [{
                 label: '+ Add Primary',
                 disabled: isPriFull,
