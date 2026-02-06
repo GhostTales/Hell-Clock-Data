@@ -760,6 +760,9 @@ class RelicEditor {
     renderGrid() {
         if (!this.data.save || !this.data.config) return;
         const container = document.getElementById('gridContainer');
+        
+        // Ensure map exists
+        if (!this.relicDomMap) this.relicDomMap = new WeakMap();
 
         const shapeConfig = this.data.config.playerInventoryShapeTiers;
         const currentShape = shapeConfig[shapeConfig.length - 1]; 
@@ -767,12 +770,12 @@ class RelicEditor {
         const width = currentShape.width;
         const height = currentShape.height;
 
-        // --- 1. Sync Background Grid (Only rebuild if shape changes) ---
+        // --- 1. Manage Background Slots ---
         const totalSlots = width * height;
         const existingSlots = container.querySelectorAll('.grid-slot');
         
         if (existingSlots.length !== totalSlots) {
-            container.innerHTML = ''; // Only clear if structural change
+            container.innerHTML = ''; 
             container.style.gridTemplateColumns = `repeat(${width}, var(--grid-cell-size))`;
             container.style.gridTemplateRows = `repeat(${height}, var(--grid-cell-size))`;
 
@@ -783,85 +786,76 @@ class RelicEditor {
             });
         }
 
-        // --- 2. Sync Relic Items (Reuse Elements) ---
+        // --- 2. Manage Relic Items ---
         const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
         const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         const gap = 4;
-        
-        // Track which elements are currently in use
-        const activeIndices = new Set();
+
+        // Mark existing as stale
+        const currentRelics = container.querySelectorAll('.relic-item');
+        currentRelics.forEach(el => el.dataset.stale = "true");
 
         loadout.Items.forEach((item, index) => {
-            activeIndices.add(index);
             const def = this.definitions.relics[item._relicBaseDefinitionID];
             const size = this.getRelicSize(def);
-
-            // Generate a signature to detect if the *content* (icon) changed
-            // Signature: ID + Tier + Rarity + Size
             const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
 
-            // Try to find existing element
-            let el = container.querySelector(`.relic-item[data-index="${index}"]`);
+            // Get existing or Create new
+            let el = this.relicDomMap.get(item);
 
-            if (!el) {
-                // CREATE new element if missing
+            if (!el || !container.contains(el)) {
                 el = document.createElement('div');
-                el.className = `relic-item rarity-${item._eRelicRarity}`;
-                el.setAttribute('data-index', index);
-                
-                // Add event listeners once
-                el.onmousedown = (e) => {
-                    e.stopPropagation(); 
-                    this.initDrag(e, item, index, el, 'main');
-                };
-                el.oncontextmenu = (e) => {
-                    e.preventDefault(); 
-                    e.stopPropagation();
-                    this.startCopy(e, item);
-                };
-                
+                this.relicDomMap.set(item, el); 
                 container.appendChild(el);
-                
-                // Force render content for new item
-                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
-                el.dataset.signature = contentSignature;
+                el.dataset.signature = 'new'; 
             }
 
-            // UPDATE Properties (Always update position/selection)
-            // Class Update
+            // CRITICAL FIX: Update Event Listeners EVERY render
+            // This ensures 'index' is always the CURRENT index, not the old one.
+            el.onmousedown = (e) => {
+                e.stopPropagation(); 
+                this.initDrag(e, item, index, el, 'main');
+            };
+            el.oncontextmenu = (e) => {
+                e.preventDefault(); 
+                e.stopPropagation();
+                this.startCopy(e, item);
+            };
+
+            // Update Status
+            el.dataset.stale = "false";
+            el.dataset.index = index; 
+
+            // Update Visuals
             const isSelected = (this.selectedContainer === 'main' && index === this.selectedRelicIndex);
             el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
 
-            // Position Update
             const visualY = height - item._position.y - size.h;
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
             el.style.top = `${visualY * (cellSize + gap) + 10}px`;
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 
-            // Content Update (Only if data changed)
+            // Update Content if needed
             if (el.dataset.signature !== contentSignature) {
                 this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
                 el.dataset.signature = contentSignature;
             }
         });
 
-        // --- 3. Cleanup ---
-        // Remove DOM elements for items that no longer exist in the data
-        const allRelicEls = container.querySelectorAll('.relic-item');
-        allRelicEls.forEach(el => {
-            if (!activeIndices.has(parseInt(el.dataset.index))) {
-                el.remove();
-            }
-        });
+        // Cleanup
+        const staleRelics = container.querySelectorAll('.relic-item[data-stale="true"]');
+        staleRelics.forEach(el => el.remove());
 
         this.renderStash();
     }
 
     renderStash() {
         const container = document.getElementById('stashContainer');
+        
+        if (!this.relicDomMap) this.relicDomMap = new WeakMap();
 
-        // --- 1. Sync Background Grid ---
+        // --- 1. Manage Background ---
         const totalSlots = this.stashWidth * this.stashHeight;
         const existingSlots = container.querySelectorAll('.grid-slot');
 
@@ -879,51 +873,49 @@ class RelicEditor {
             }
         }
 
-        // --- 2. Sync Stash Items ---
-        const activeIndices = new Set();
+        // --- 2. Manage Items ---
+        const currentRelics = container.querySelectorAll('.relic-item');
+        currentRelics.forEach(el => el.dataset.stale = "true");
+
         const cellSize = this.stashCellSize;
         const gap = 4;
 
         this.stashItems.forEach((item, index) => {
-            activeIndices.add(index);
             const def = this.definitions.relics[item._relicBaseDefinitionID];
             const size = this.getRelicSize(def);
             const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
 
-            let el = container.querySelector(`.relic-item[data-index="${index}"]`);
+            let el = this.relicDomMap.get(item);
 
-            if (!el) {
+            if (!el || !container.contains(el)) {
                 el = document.createElement('div');
-                el.className = `relic-item rarity-${item._eRelicRarity}`;
-                el.setAttribute('data-index', index);
-
-                el.onmousedown = (e) => {
-                    e.stopPropagation();
-                    this.initDrag(e, item, index, el, 'stash');
-                };
-                el.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.startCopy(e, item);
-                };
-
+                this.relicDomMap.set(item, el);
                 container.appendChild(el);
-                
-                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
-                el.dataset.signature = contentSignature;
+                el.dataset.signature = 'new';
             }
 
-            // Update Class
+            // CRITICAL FIX: Update Event Listeners EVERY render
+            el.onmousedown = (e) => {
+                e.stopPropagation();
+                this.initDrag(e, item, index, el, 'stash');
+            };
+            el.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.startCopy(e, item);
+            };
+
+            el.dataset.stale = "false";
+            el.dataset.index = index;
+
             const isSelected = (this.selectedContainer === 'stash' && index === this.selectedRelicIndex);
             el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
 
-            // Update Position
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
             el.style.top = `${item._position.y * (cellSize + gap) + 10}px`;
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 
-            // Update Content if needed
             if (el.dataset.signature !== contentSignature) {
                 this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
                 el.dataset.signature = contentSignature;
@@ -931,12 +923,8 @@ class RelicEditor {
         });
 
         // Cleanup
-        const allRelicEls = container.querySelectorAll('.relic-item');
-        allRelicEls.forEach(el => {
-            if (!activeIndices.has(parseInt(el.dataset.index))) {
-                el.remove();
-            }
-        });
+        const staleRelics = container.querySelectorAll('.relic-item[data-stale="true"]');
+        staleRelics.forEach(el => el.remove());
     }
 
     calculateRealValue(roll, range, level, affixDef) {
