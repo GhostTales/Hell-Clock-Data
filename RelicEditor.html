@@ -2532,54 +2532,57 @@ class RelicEditor {
 
     renderRelicContent(container, def, tier) {
         container.innerHTML = ''; 
-
         if (!def) return;
 
-        // 1. Determine the sprite name base
-        let spriteName = def.sprite;
-
-        // Fallback: If no sprite key, use convention "IconRelic_{Size}{Tier}"
-        if (!spriteName && def.eRelicSize) {
-            const t = tier || 1;
-            spriteName = `IconRelic_${def.eRelicSize}${t}`;
-        }
-
-        if (spriteName) {
-            // Remove .png extension if present so we can add it back cleanly
-            let baseName = spriteName;
-            if (baseName.toLowerCase().endsWith('.png')) {
-                baseName = baseName.slice(0, -4);
+        // --- PATH A: Explicit "sprite" key (Strict Mode) ---
+        // As requested, we assume this key is correct and do NOT perform casing retries.
+        if (def.sprite) {
+            let spriteName = def.sprite;
+            if (!spriteName.toLowerCase().endsWith('.png')) {
+                spriteName += '.png';
             }
 
             const img = document.createElement('img');
-            
-            // ATTEMPT 1: Try LOWERCASE first (Preferred)
-            // Example: icons/iconrelic_small1.png
-            img.src = `icons/${baseName.toLowerCase()}.png`;
-            
+            img.src = `icons/${spriteName}`;
             img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
             img.draggable = false;
             container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
             
-            // ERROR HANDLER & RETRY LOGIC
             img.onerror = () => {
-                // If we haven't retried yet...
-                if (!img.dataset.retried) {
-                    img.dataset.retried = "true"; // Mark as retried
-                    
-                    // ATTEMPT 2: Try the Original Capitalized variant
-                    // Example: icons/IconRelic_Small1.png
-                    console.log(`404 on lowercase attempt. Retrying with original casing: icons/${baseName}.png`);
-                    img.src = `icons/${baseName}.png`;
-                    return; // Exit and let the browser try the new URL
-                }
-                
-                // If we reach here, both attempts failed. Show text fallback.
-                console.warn(`Failed to load icon (both cases): ${baseName}`);
+                console.warn(`Failed to load explicitly defined sprite: ${spriteName}`);
                 img.remove();
                 this.renderRelicTextFallback(container, def, tier);
             };
+            container.appendChild(img);
+            return; // Exit here, do not run the fallback logic
+        }
 
+        // --- PATH B: No "sprite" key (Convention + Retry Logic) ---
+        // Logic: Try Lowercase first -> Retry with Original Casing
+        if (def.eRelicSize) {
+            const t = tier || 1;
+            const baseName = `IconRelic_${def.eRelicSize}${t}`; // e.g. IconRelic_Small1
+
+            const img = document.createElement('img');
+            img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
+            img.draggable = false;
+            container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
+
+            // Attempt 1: Lowercase (e.g., icons/iconrelic_small1.png)
+            img.src = `icons/${baseName.toLowerCase()}.png`;
+
+            img.onerror = () => {
+                if (!img.dataset.retried) {
+                    img.dataset.retried = "true";
+                    // Attempt 2: Original Capitalization (e.g., icons/IconRelic_Small1.png)
+                    console.log(`404 on lowercase. Retrying: icons/${baseName}.png`);
+                    img.src = `icons/${baseName}.png`;
+                } else {
+                    // Both failed
+                    img.remove();
+                    this.renderRelicTextFallback(container, def, tier);
+                }
+            };
             container.appendChild(img);
         } else {
             this.renderRelicTextFallback(container, def, tier);
