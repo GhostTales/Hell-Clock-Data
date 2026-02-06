@@ -2553,9 +2553,9 @@ class RelicEditor {
 
             const img = document.createElement('img');
             
-            // ATTEMPT 1: Try the name exactly as it appears in the data (Capitalized)
-            // Example: icons/IconRelic_Small1.png
-            img.src = `icons/${baseName}.png`;
+            // ATTEMPT 1: Try LOWERCASE first (Preferred)
+            // Example: icons/iconrelic_small1.png
+            img.src = `icons/${baseName.toLowerCase()}.png`;
             
             img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
             img.draggable = false;
@@ -2565,17 +2565,13 @@ class RelicEditor {
             img.onerror = () => {
                 // If we haven't retried yet...
                 if (!img.dataset.retried) {
-                    img.dataset.retried = "true"; // Mark as retried so we don't loop forever
+                    img.dataset.retried = "true"; // Mark as retried
                     
-                    // ATTEMPT 2: Try the lowercase variant
-                    // If the first attempt was "IconRelic_Small1", this tries "IconRelic_small1"
-                    if (!def.sprite && def.eRelicSize) {
-                        const t = tier || 1;
-                        const lowerName = `IconRelic_${def.eRelicSize.toLowerCase()}${t}`;
-                        console.log(`404 on first attempt. Retrying with: icons/${lowerName}.png`);
-                        img.src = `icons/${lowerName}.png`;
-                        return; // Exit and let the browser try the new URL
-                    }
+                    // ATTEMPT 2: Try the Original Capitalized variant
+                    // Example: icons/IconRelic_Small1.png
+                    console.log(`404 on lowercase attempt. Retrying with original casing: icons/${baseName}.png`);
+                    img.src = `icons/${baseName}.png`;
+                    return; // Exit and let the browser try the new URL
                 }
                 
                 // If we reach here, both attempts failed. Show text fallback.
