@@ -2489,7 +2489,7 @@ class RelicEditor {
         if (spriteName) {
             // 2. Construct the full path
             // Handle cases where the sprite key might already have ".png"
-            let iconPath = `json_data/icons/${spriteName}`;
+            let iconPath = `icons/${spriteName}`;
             if (!spriteName.toLowerCase().endsWith('.png')) {
                 iconPath += '.png';
             }
