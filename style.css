@@ -281,7 +281,7 @@ input[type="file"] {
     z-index: 30;
 }
 
-/* Rarity Colors (Adjusted for Dark Mode) */
+/* Rarity Colors */
 .rarity-0 { border-color: #8b949e; background: #21262d; } 
 .rarity-1 { border-color: #58a6ff; background: #10182d; } 
 .rarity-2 { border-color: #d29922; background: #251e08; } 
