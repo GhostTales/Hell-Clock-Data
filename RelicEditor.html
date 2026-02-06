@@ -2473,9 +2473,11 @@ class RelicEditor {
     }
 
     renderRelicContent(container, def, tier) {
-        container.innerHTML = ''; // Clear previous content
+        container.innerHTML = ''; 
 
-        // Determine the sprite name
+        if (!def) return;
+
+        // 1. Determine the sprite name
         let spriteName = def.sprite;
 
         // Fallback: If no sprite key, use convention "IconRelic_{Size}{Tier}"
@@ -2485,16 +2487,26 @@ class RelicEditor {
         }
 
         if (spriteName) {
+            // 2. Construct the full path
+            // Handle cases where the sprite key might already have ".png"
+            let iconPath = `json_data/icons/${spriteName}`;
+            if (!spriteName.toLowerCase().endsWith('.png')) {
+                iconPath += '.png';
+            }
+
             const img = document.createElement('img');
-            img.src = `icons/${spriteName}.png`;
+            img.src = iconPath;
             img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
             img.draggable = false;
             
             // Add tooltip so user can identify the item on hover
             container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
             
-            // Safety: Revert to text if the image file is missing
+            // 3. Error Handler
+            // If the browser fails to find the image (404), remove image and show text
             img.onerror = () => {
+                // Console warning helps debug which specific file is missing
+                console.warn(`Failed to load icon: ${iconPath}`);
                 img.remove();
                 this.renderRelicTextFallback(container, def, tier);
             };
