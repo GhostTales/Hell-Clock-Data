@@ -760,9 +760,6 @@ class RelicEditor {
     renderGrid() {
         if (!this.data.save || !this.data.config) return;
         const container = document.getElementById('gridContainer');
-        container.innerHTML = '';
-
-        if (!this.data.config) return;
 
         const shapeConfig = this.data.config.playerInventoryShapeTiers;
         const currentShape = shapeConfig[shapeConfig.length - 1]; 
@@ -770,102 +767,175 @@ class RelicEditor {
         const width = currentShape.width;
         const height = currentShape.height;
 
-        container.style.gridTemplateColumns = `repeat(${width}, var(--grid-cell-size))`;
-        container.style.gridTemplateRows = `repeat(${height}, var(--grid-cell-size))`;
-
-        currentShape.shape.forEach(isValid => {
-            const div = document.createElement('div');
-            div.className = `grid-slot ${isValid ? '' : 'blocked'}`;
-            container.appendChild(div);
-        });
-
-        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        // --- 1. Sync Background Grid (Only rebuild if shape changes) ---
+        const totalSlots = width * height;
+        const existingSlots = container.querySelectorAll('.grid-slot');
         
+        if (existingSlots.length !== totalSlots) {
+            container.innerHTML = ''; // Only clear if structural change
+            container.style.gridTemplateColumns = `repeat(${width}, var(--grid-cell-size))`;
+            container.style.gridTemplateRows = `repeat(${height}, var(--grid-cell-size))`;
+
+            currentShape.shape.forEach(isValid => {
+                const div = document.createElement('div');
+                div.className = `grid-slot ${isValid ? '' : 'blocked'}`;
+                container.appendChild(div);
+            });
+        }
+
+        // --- 2. Sync Relic Items (Reuse Elements) ---
+        const loadout = this.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
+        const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
+        const gap = 4;
+        
+        // Track which elements are currently in use
+        const activeIndices = new Set();
+
         loadout.Items.forEach((item, index) => {
+            activeIndices.add(index);
             const def = this.definitions.relics[item._relicBaseDefinitionID];
             const size = this.getRelicSize(def);
-            
-            const el = document.createElement('div');
-            el.className = `relic-item rarity-${item._eRelicRarity}`;
-            if (this.selectedContainer === 'main' && index === this.selectedRelicIndex) {
-                el.classList.add('selected');
+
+            // Generate a signature to detect if the *content* (icon) changed
+            // Signature: ID + Tier + Rarity + Size
+            const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
+
+            // Try to find existing element
+            let el = container.querySelector(`.relic-item[data-index="${index}"]`);
+
+            if (!el) {
+                // CREATE new element if missing
+                el = document.createElement('div');
+                el.className = `relic-item rarity-${item._eRelicRarity}`;
+                el.setAttribute('data-index', index);
+                
+                // Add event listeners once
+                el.onmousedown = (e) => {
+                    e.stopPropagation(); 
+                    this.initDrag(e, item, index, el, 'main');
+                };
+                el.oncontextmenu = (e) => {
+                    e.preventDefault(); 
+                    e.stopPropagation();
+                    this.startCopy(e, item);
+                };
+                
+                container.appendChild(el);
+                
+                // Force render content for new item
+                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
+                el.dataset.signature = contentSignature;
             }
 
-            const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
-            const gap = 4;
+            // UPDATE Properties (Always update position/selection)
+            // Class Update
+            const isSelected = (this.selectedContainer === 'main' && index === this.selectedRelicIndex);
+            el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
 
+            // Position Update
             const visualY = height - item._position.y - size.h;
-            
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
             el.style.top = `${visualY * (cellSize + gap) + 10}px`;
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 
-            this.renderRelicContent(el, def, item._tier);
-            
-            el.onmousedown = (e) => {
-                e.stopPropagation(); 
-                this.initDrag(e, item, index, el, 'main');
-            };
-
-            el.oncontextmenu = (e) => {
-                e.preventDefault(); 
-                e.stopPropagation();
-                this.startCopy(e, item);
-            };
-
-            container.appendChild(el);
+            // Content Update (Only if data changed)
+            if (el.dataset.signature !== contentSignature) {
+                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
+                el.dataset.signature = contentSignature;
+            }
         });
+
+        // --- 3. Cleanup ---
+        // Remove DOM elements for items that no longer exist in the data
+        const allRelicEls = container.querySelectorAll('.relic-item');
+        allRelicEls.forEach(el => {
+            if (!activeIndices.has(parseInt(el.dataset.index))) {
+                el.remove();
+            }
+        });
+
         this.renderStash();
     }
 
     renderStash() {
         const container = document.getElementById('stashContainer');
-        container.innerHTML = '';
 
-        container.style.gridTemplateColumns = `repeat(${this.stashWidth}, ${this.stashCellSize}px)`;
-        container.style.gridTemplateRows = `repeat(${this.stashHeight}, ${this.stashCellSize}px)`;
-
+        // --- 1. Sync Background Grid ---
         const totalSlots = this.stashWidth * this.stashHeight;
-        for(let i=0; i<totalSlots; i++) {
-            const div = document.createElement('div');
-            div.className = 'grid-slot';
-            div.style.width = `${this.stashCellSize}px`;
-            div.style.height = `${this.stashCellSize}px`;
-            container.appendChild(div);
+        const existingSlots = container.querySelectorAll('.grid-slot');
+
+        if (existingSlots.length !== totalSlots) {
+            container.innerHTML = '';
+            container.style.gridTemplateColumns = `repeat(${this.stashWidth}, ${this.stashCellSize}px)`;
+            container.style.gridTemplateRows = `repeat(${this.stashHeight}, ${this.stashCellSize}px)`;
+            
+            for(let i=0; i<totalSlots; i++) {
+                const div = document.createElement('div');
+                div.className = 'grid-slot';
+                div.style.width = `${this.stashCellSize}px`;
+                div.style.height = `${this.stashCellSize}px`;
+                container.appendChild(div);
+            }
         }
 
+        // --- 2. Sync Stash Items ---
+        const activeIndices = new Set();
+        const cellSize = this.stashCellSize;
+        const gap = 4;
+
         this.stashItems.forEach((item, index) => {
+            activeIndices.add(index);
             const def = this.definitions.relics[item._relicBaseDefinitionID];
             const size = this.getRelicSize(def);
-        
-            const el = document.createElement('div');
-            el.className = `relic-item rarity-${item._eRelicRarity}`;
-            if (this.selectedContainer === 'stash' && index === this.selectedRelicIndex) el.classList.add('selected');
-        
-            const cellSize = this.stashCellSize;
-            const gap = 4;
+            const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
 
+            let el = container.querySelector(`.relic-item[data-index="${index}"]`);
+
+            if (!el) {
+                el = document.createElement('div');
+                el.className = `relic-item rarity-${item._eRelicRarity}`;
+                el.setAttribute('data-index', index);
+
+                el.onmousedown = (e) => {
+                    e.stopPropagation();
+                    this.initDrag(e, item, index, el, 'stash');
+                };
+                el.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.startCopy(e, item);
+                };
+
+                container.appendChild(el);
+                
+                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
+                el.dataset.signature = contentSignature;
+            }
+
+            // Update Class
+            const isSelected = (this.selectedContainer === 'stash' && index === this.selectedRelicIndex);
+            el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
+
+            // Update Position
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
             el.style.top = `${item._position.y * (cellSize + gap) + 10}px`;
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
-        
-            
-            this.renderRelicContent(el, def, item._tier);
 
-            el.onmousedown = (e) => {
-                e.stopPropagation();
-                this.initDrag(e, item, index, el, 'stash');
-            };
+            // Update Content if needed
+            if (el.dataset.signature !== contentSignature) {
+                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
+                el.dataset.signature = contentSignature;
+            }
+        });
 
-            el.oncontextmenu = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.startCopy(e, item);
-            };
-
-            container.appendChild(el);
+        // Cleanup
+        const allRelicEls = container.querySelectorAll('.relic-item');
+        allRelicEls.forEach(el => {
+            if (!activeIndices.has(parseInt(el.dataset.index))) {
+                el.remove();
+            }
         });
     }
 
