@@ -2477,7 +2477,7 @@ class RelicEditor {
 
         if (!def) return;
 
-        // 1. Determine the sprite name
+        // 1. Determine the sprite name base
         let spriteName = def.sprite;
 
         // Fallback: If no sprite key, use convention "IconRelic_{Size}{Tier}"
@@ -2487,26 +2487,41 @@ class RelicEditor {
         }
 
         if (spriteName) {
-            // 2. Construct the full path
-            // Handle cases where the sprite key might already have ".png"
-            let iconPath = `icons/${spriteName}`;
-            if (!spriteName.toLowerCase().endsWith('.png')) {
-                iconPath += '.png';
+            // Remove .png extension if present so we can add it back cleanly
+            let baseName = spriteName;
+            if (baseName.toLowerCase().endsWith('.png')) {
+                baseName = baseName.slice(0, -4);
             }
 
             const img = document.createElement('img');
-            img.src = iconPath;
+            
+            // ATTEMPT 1: Try the name exactly as it appears in the data (Capitalized)
+            // Example: icons/IconRelic_Small1.png
+            img.src = `icons/${baseName}.png`;
+            
             img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
             img.draggable = false;
-            
-            // Add tooltip so user can identify the item on hover
             container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
             
-            // 3. Error Handler
-            // If the browser fails to find the image (404), remove image and show text
+            // ERROR HANDLER & RETRY LOGIC
             img.onerror = () => {
-                // Console warning helps debug which specific file is missing
-                console.warn(`Failed to load icon: ${iconPath}`);
+                // If we haven't retried yet...
+                if (!img.dataset.retried) {
+                    img.dataset.retried = "true"; // Mark as retried so we don't loop forever
+                    
+                    // ATTEMPT 2: Try the lowercase variant
+                    // If the first attempt was "IconRelic_Small1", this tries "IconRelic_small1"
+                    if (!def.sprite && def.eRelicSize) {
+                        const t = tier || 1;
+                        const lowerName = `IconRelic_${def.eRelicSize.toLowerCase()}${t}`;
+                        console.log(`404 on first attempt. Retrying with: icons/${lowerName}.png`);
+                        img.src = `icons/${lowerName}.png`;
+                        return; // Exit and let the browser try the new URL
+                    }
+                }
+                
+                // If we reach here, both attempts failed. Show text fallback.
+                console.warn(`Failed to load icon (both cases): ${baseName}`);
                 img.remove();
                 this.renderRelicTextFallback(container, def, tier);
             };
