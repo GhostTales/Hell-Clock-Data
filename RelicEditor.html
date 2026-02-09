@@ -2594,7 +2594,7 @@ class RelicEditor {
                         const lowerName = `IconRelic_${def.eRelicSize.toLowerCase()}${t}`;
                         const candidate2 = `icons/${lowerName}.png`;
                         
-                        console.log(`Retrying with: ${candidate2}`);
+                        //console.log(`Retrying with: ${candidate2}`);
                         img.src = candidate2;
                         return; // Browser will trigger onload or onerror again for the new src
                     }
