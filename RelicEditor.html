@@ -206,6 +206,8 @@ class RelicEditor {
             }
         };
 
+        this.resolvedImageCache = new Map();
+
         this.stashItems = []; // Items here are NOT in this.data.save
         this.stashWidth = 6;  
         this.stashHeight = 50; // Arbitrary height
@@ -2532,10 +2534,30 @@ class RelicEditor {
 
     renderRelicContent(container, def, tier) {
         container.innerHTML = ''; 
-
         if (!def) return;
 
-        // 1. Determine the sprite name base
+        // Create a unique key for this relic + tier combo
+        const cacheKey = `${def.id}_${tier || 1}`;
+
+        // Helper to configure the image element consistently
+        const configureImage = (imgElement, srcUrl) => {
+            imgElement.src = srcUrl;
+            imgElement.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
+            imgElement.draggable = false;
+            container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
+            container.appendChild(imgElement);
+        };
+
+        // --- PATH A: CACHE HIT ---
+        // If we already know the correct URL, use it immediately.
+        if (this.resolvedImageCache.has(cacheKey)) {
+            const img = document.createElement('img');
+            configureImage(img, this.resolvedImageCache.get(cacheKey));
+            return;
+        }
+
+        // --- PATH B: NEW FETCH (CACHE MISS) ---
+        // Determine the sprite name base
         let spriteName = def.sprite;
 
         // Fallback: If no sprite key, use convention "IconRelic_{Size}{Tier}"
@@ -2545,7 +2567,6 @@ class RelicEditor {
         }
 
         if (spriteName) {
-            // Remove .png extension if present so we can add it back cleanly
             let baseName = spriteName;
             if (baseName.toLowerCase().endsWith('.png')) {
                 baseName = baseName.slice(0, -4);
@@ -2553,38 +2574,38 @@ class RelicEditor {
 
             const img = document.createElement('img');
             
-            // ATTEMPT 1: Try the name exactly as it appears in the data (Capitalized)
-            // Example: icons/IconRelic_Small1.png
-            img.src = `icons/${baseName}.png`;
-            
-            img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block;';
-            img.draggable = false;
-            container.title = this.formatRelicDisplay(this.getRelicName(def, tier));
+            // ATTEMPT 1: Try Capitalized (Standard)
+            const candidate1 = `icons/${baseName}.png`;
+            configureImage(img, candidate1);
+
+            // SUCCESS HANDLER: Cache the working URL
+            img.onload = () => {
+                this.resolvedImageCache.set(cacheKey, img.src);
+            };
             
             // ERROR HANDLER & RETRY LOGIC
             img.onerror = () => {
-                // If we haven't retried yet...
                 if (!img.dataset.retried) {
-                    img.dataset.retried = "true"; // Mark as retried so we don't loop forever
+                    img.dataset.retried = "true";
                     
-                    // ATTEMPT 2: Try the lowercase variant
-                    // If the first attempt was "IconRelic_Small1", this tries "IconRelic_small1"
+                    // ATTEMPT 2: Try Lowercase Fallback
                     if (!def.sprite && def.eRelicSize) {
                         const t = tier || 1;
                         const lowerName = `IconRelic_${def.eRelicSize.toLowerCase()}${t}`;
-                        console.log(`404 on first attempt. Retrying with: icons/${lowerName}.png`);
-                        img.src = `icons/${lowerName}.png`;
-                        return; // Exit and let the browser try the new URL
+                        const candidate2 = `icons/${lowerName}.png`;
+                        
+                        console.log(`Retrying with: ${candidate2}`);
+                        img.src = candidate2;
+                        return; // Browser will trigger onload or onerror again for the new src
                     }
                 }
                 
-                // If we reach here, both attempts failed. Show text fallback.
-                console.warn(`Failed to load icon (both cases): ${baseName}`);
+                // FINAL FAILURE: Both attempts failed
+                console.warn(`Failed to load icon: ${baseName}`);
                 img.remove();
                 this.renderRelicTextFallback(container, def, tier);
             };
 
-            container.appendChild(img);
         } else {
             this.renderRelicTextFallback(container, def, tier);
         }
