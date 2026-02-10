@@ -24,8 +24,8 @@ export class DragManager {
         this.dragElement = element;
         this.dragSource = source;
 
-        const def = this.editor.definitions.relics[item._relicBaseDefinitionID];
-        this.dragItemSize = this.editor.getRelicSize(def);
+        const def = this.editor.dataManager.definitions.relics[item._relicBaseDefinitionID];
+        this.dragItemSize = this.editor.dataManager.getRelicSize(def);
         
         this.isDragging = false;
 
@@ -74,7 +74,7 @@ export class DragManager {
             let t = (mx - stashCenterX) / (mainCenterX - stashCenterX);
             t = Math.max(0, Math.min(1, t));
 
-            const startSize = this.editor.stashCellSize;
+            const startSize = this.editor.dataManager.stashCellSize;
             const endSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
             const currentCellSize = startSize + t * (endSize - startSize);
 
@@ -112,8 +112,8 @@ export class DragManager {
             }
             this.editor.selectedRelicIndex = this.dragIndex;
             this.editor.selectedContainer = this.dragSource; 
-            this.editor.renderGrid();      
-            this.editor.renderInspector(); 
+            this.editor.renderer.renderGrid();      
+            this.editor.inspector.renderInspector(); 
             return;
         }
 
@@ -142,7 +142,7 @@ export class DragManager {
             this.attemptDrop(targetType, mx, my);
         } else {
             if (this.dragSource !== 'copy_mode') {
-                this.editor.renderGrid();
+                this.editor.renderer.renderGrid();
             }
         }
     }
@@ -158,15 +158,15 @@ export class DragManager {
             });
 
             if (this.dragSource === 'main') {
-                const loadout = this.editor.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
+                const loadout = this.editor.dataManager.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
                 loadout.Items.splice(this.dragIndex, 1);
             } else if (this.dragSource === 'stash') {
-                this.editor.stashItems.splice(this.dragIndex, 1);
+                this.editor.dataManager.stashItems.splice(this.dragIndex, 1);
             }
             
             this.editor.selectedRelicIndex = -1;
-            this.editor.renderGrid();
-            this.editor.renderInspector();
+            this.editor.renderer.renderGrid();
+            this.editor.inspector.renderInspector();
             return;
         }
 
@@ -176,7 +176,7 @@ export class DragManager {
         
         let targetCellSize;
         if (isStash) {
-            targetCellSize = this.editor.stashCellSize;
+            targetCellSize = this.editor.dataManager.stashCellSize;
         } else {
             targetCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         }
@@ -197,16 +197,16 @@ export class DragManager {
         let gridW, gridH, targetArray;
         let finalDataY = visualY; 
         
-        const shapeConfig = this.editor.data.config.playerInventoryShapeTiers;
+        const shapeConfig = this.editor.dataManager.data.config.playerInventoryShapeTiers;
         const currentShape = shapeConfig[shapeConfig.length - 1];
-        const loadout = this.editor.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
-        const def = this.editor.definitions.relics[this.dragItem._relicBaseDefinitionID];
-        const size = this.editor.getRelicSize(def);
+        const loadout = this.editor.dataManager.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
+        const def = this.editor.dataManager.definitions.relics[this.dragItem._relicBaseDefinitionID];
+        const size = this.editor.dataManager.getRelicSize(def);
 
         if (isStash) {
-            gridW = this.editor.stashWidth;
-            gridH = this.editor.stashHeight;
-            targetArray = this.editor.stashItems;
+            gridW = this.editor.dataManager.stashWidth;
+            gridH = this.editor.dataManager.stashHeight;
+            targetArray = this.editor.dataManager.stashItems;
         } else {
             gridW = currentShape.width;
             gridH = currentShape.height;
@@ -215,7 +215,7 @@ export class DragManager {
         }
 
         if (targetX < 0 || visualY < 0 || targetX + size.w > gridW || visualY + size.h > gridH) {
-            if (this.dragSource !== 'copy_mode') this.editor.renderGrid(); 
+            if (this.dragSource !== 'copy_mode') this.editor.renderer.renderGrid(); 
             return;
         }
 
@@ -225,11 +225,11 @@ export class DragManager {
         }
 
         for (let other of collisionList) {
-            const oDef = this.editor.definitions.relics[other._relicBaseDefinitionID];
-            const oSize = this.editor.getRelicSize(oDef);
+            const oDef = this.editor.dataManager.definitions.relics[other._relicBaseDefinitionID];
+            const oSize = this.editor.dataManager.getRelicSize(oDef);
             const overlap = !(targetX >= other._position.x + oSize.w || targetX + size.w <= other._position.x || finalDataY >= other._position.y + oSize.h || finalDataY + size.h <= other._position.y);
             if (overlap) { 
-                if (this.dragSource !== 'copy_mode') this.editor.renderGrid(); 
+                if (this.dragSource !== 'copy_mode') this.editor.renderer.renderGrid(); 
                 return; 
             }
         }
@@ -241,7 +241,7 @@ export class DragManager {
                      const cy = finalDataY + h;
                      const vRow = gridH - 1 - cy; 
                      if (!currentShape.shape[vRow * gridW + cx]) {
-                         if (this.dragSource !== 'copy_mode') this.editor.renderGrid(); 
+                         if (this.dragSource !== 'copy_mode') this.editor.renderer.renderGrid(); 
                          return; 
                      }
                  }
@@ -252,7 +252,7 @@ export class DragManager {
             if (this.dragSource === 'main') {
                 loadout.Items.splice(this.dragIndex, 1);
             } else if (this.dragSource === 'stash') {
-                this.editor.stashItems.splice(this.dragIndex, 1);
+                this.editor.dataManager.stashItems.splice(this.dragIndex, 1);
             }
         }
 
@@ -262,14 +262,14 @@ export class DragManager {
         if (targetType === 'main') {
             loadout.Items.push(this.dragItem);
         } else {
-            this.editor.stashItems.push(this.dragItem);
+            this.editor.dataManager.stashItems.push(this.dragItem);
         }
 
         this.editor.selectedContainer = targetType;
-        this.editor.selectedRelicIndex = (targetType === 'main' ? loadout.Items.length : this.editor.stashItems.length) - 1;
+        this.editor.selectedRelicIndex = (targetType === 'main' ? loadout.Items.length : this.editor.dataManager.stashItems.length) - 1;
 
-        this.editor.renderGrid();
-        this.editor.renderInspector();
+        this.editor.renderer.renderGrid();
+        this.editor.inspector.renderInspector();
     }
 
     undoLastDelete() {
@@ -285,18 +285,18 @@ export class DragManager {
         const isStash = (record.source === 'stash');
 
         if (isStash) {
-            targetArray = this.editor.stashItems;
+            targetArray = this.editor.dataManager.stashItems;
         } else {
-            const loadout = this.editor.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
+            const loadout = this.editor.dataManager.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
             targetArray = loadout.Items;
         }
 
-        const def = this.editor.definitions.relics[item._relicBaseDefinitionID];
-        const size = this.editor.getRelicSize(def);
+        const def = this.editor.dataManager.definitions.relics[item._relicBaseDefinitionID];
+        const size = this.editor.dataManager.getRelicSize(def);
         
         const isBlocked = targetArray.some(other => {
-            const oDef = this.editor.definitions.relics[other._relicBaseDefinitionID];
-            const oSize = this.editor.getRelicSize(oDef);
+            const oDef = this.editor.dataManager.definitions.relics[other._relicBaseDefinitionID];
+            const oSize = this.editor.dataManager.getRelicSize(oDef);
             
             return !(
                 item._position.x >= other._position.x + oSize.w || 
@@ -316,21 +316,21 @@ export class DragManager {
         this.editor.selectedContainer = record.source;
         this.editor.selectedRelicIndex = targetArray.length - 1;
 
-        this.editor.renderGrid();
-        this.editor.renderInspector();
+        this.editor.renderer.renderGrid();
+        this.editor.inspector.renderInspector();
     }
 
     startCopy(e, originalItem) {
         if (this.isDragging) return;
 
         const clone = JSON.parse(JSON.stringify(originalItem));
-        const def = this.editor.definitions.relics[clone._relicBaseDefinitionID];
-        const size = this.editor.getRelicSize(def);
+        const def = this.editor.dataManager.definitions.relics[clone._relicBaseDefinitionID];
+        const size = this.editor.dataManager.getRelicSize(def);
         
         const el = document.createElement('div');
         el.className = `relic-item rarity-${clone._eRelicRarity} dragging`;
         
-        this.editor.renderRelicContent(el, def, clone._tier);
+        this.editor.renderer.renderRelicContent(el, def, clone._tier);
         
         const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         const gap = 4;

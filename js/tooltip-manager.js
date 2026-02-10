@@ -1,4 +1,6 @@
 // c:\MasterFolder\Programming\Hell-Clock-Data\js\tooltip-manager.js
+import { formatString } from './utils.js';
+
 export class TooltipManager {
     constructor(editor) {
         this.editor = editor;
@@ -8,11 +10,11 @@ export class TooltipManager {
     showTooltip(e, item) {
         if (!this.tooltipEl) this.tooltipEl = document.getElementById('relicTooltip');
         
-        const def = this.editor.definitions.relics[item._relicBaseDefinitionID];
+        const def = this.editor.dataManager.definitions.relics[item._relicBaseDefinitionID];
         const tier = item._tier || 1;
         const level = item._upgradeLevel || 0;
 
-        let html = `<div class="tooltip-header">${this.editor.formatRelicDisplay(this.editor.getRelicName(def, tier))}</div>`;
+        let html = `<div class="tooltip-header">${this.editor.renderer.formatRelicDisplay(this.editor.dataManager.getRelicName(def, tier))}</div>`;
 
         const topList = [];
         const normalImplicits = [];
@@ -23,7 +25,7 @@ export class TooltipManager {
             affixList.forEach(wrapper => {
                 const data = isImplicit ? wrapper._relicAffixData : wrapper;
                 const defId = data._relicAffixDefinitionId;
-                const affixDef = this.editor.definitions.affixes[defId];
+                const affixDef = this.editor.dataManager.definitions.affixes[defId];
                 const isRareOrUnique = affixDef && (affixDef.eAffixRarity === 'Unique' || affixDef.eAffixRarity === 'Special');
 
                 if (isRareOrUnique) {
@@ -102,17 +104,17 @@ export class TooltipManager {
 
     generateAffixTooltipRow(affixData, level, tier, isImplicit) {
         const defId = affixData._relicAffixDefinitionId;
-        const def = this.editor.definitions.affixes[defId];
+        const def = this.editor.dataManager.definitions.affixes[defId];
         if (!def) return '';
 
-        const name = this.editor.getAffixName(defId);
-        const range = this.editor.getAffixRange(defId, tier);
-        const finalValStr = this.editor.calculateRealValue(affixData._rollValue, range, level, def);
+        const name = def ? formatString(def.name) : `ID: ${defId}`;
+        const range = this.editor.dataManager.getAffixRange(defId, tier);
+        const finalValStr = this.editor.dataManager.calculateRealValue(affixData._rollValue, range, level, def);
         
         let rangeStr = "";
         if (range) {
-            let minVal = this.editor.calculateRealValue(0, range, level, def);
-            let maxVal = this.editor.calculateRealValue(1, range, level, def);
+            let minVal = this.editor.dataManager.calculateRealValue(0, range, level, def);
+            let maxVal = this.editor.dataManager.calculateRealValue(1, range, level, def);
             minVal = minVal.replace(/[^0-9.-]/g, '');
             maxVal = maxVal.replace(/[^0-9.-]/g, '');
             rangeStr = `<span class="tooltip-range">[${minVal} - ${maxVal}]</span>`;
@@ -123,7 +125,7 @@ export class TooltipManager {
         
         const isRareOrUnique = def.eAffixRarity === 'Unique' || def.eAffixRarity === 'Special';
         const imgClass = isRareOrUnique ? "tooltip-icon large" : "tooltip-icon";
-        const cats = this.editor.getAffixCategory(defId);
+        const cats = this.editor.dataManager.getAffixCategory(defId);
 
         if (affixData._locked) {
             iconName = 'UI_AffixBullet-Locked.png';
@@ -162,6 +164,7 @@ export class TooltipManager {
         }
 
         if (descText) {
+            descText = descText.replace(/Barrier/g, 'Conviction');
             descText = descText.replace(/<style="[^"]+">/g, '').replace(/<\/style>/g, '');
             descText = descText.replace(/<color=(#[a-fA-F0-9]+)>(.*?)<\/color>/g, '<span style="color:$1">$2</span>');
 
