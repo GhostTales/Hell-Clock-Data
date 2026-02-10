@@ -933,3 +933,117 @@ input[type="checkbox"]:focus {
     outline: 2px solid var(--accent-color);
     outline-offset: 1px;
 }
+
+/* --- Tooltip Styling --- */
+#relicTooltip {
+    position: fixed;
+    background: rgba(13, 17, 23, 0.98);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    pointer-events: none;
+    z-index: 10000;
+    display: none;
+    color: var(--text-color);
+    font-size: 0.85rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    
+    /* Layout constraints */
+    min-width: 150px;
+    max-width: 300px; /* wrapping point */
+    white-space: normal; /* Allow text to wrap */
+}
+
+.tooltip-header {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 8px;
+    color: var(--accent-color); 
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.tooltip-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.tooltip-row {
+    display: flex;
+    align-items: flex-start; /* Align icon to top of wrapped text */
+    gap: 8px;
+    line-height: 1.4;
+    padding: 2px 0;
+}
+
+.tooltip-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+    margin-top: 3px; /* visual alignment with text */
+}
+
+.tooltip-icon.large {
+    width: 48px;
+    height: 48px;
+    margin-left: -5px;
+    margin-right: 5px;
+    margin-top: 0;
+}
+
+.tooltip-icon.colored {
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    background-color: currentColor;
+}
+
+/* Flex container for Name + Range */
+.tooltip-text {
+    flex: 1;
+    display: flex;
+    justify-content: space-between; /* Pushes Range to right */
+    align-items: flex-start; /* Top align allows wrapping without weird spacing */
+    gap: 15px; /* Minimum space between text and range */
+    width: 100%;
+}
+
+/* The Name / Description */
+.tooltip-val, .tooltip-desc {
+    color: #c9d1d9;
+    flex: 1; /* Takes available space */
+    word-wrap: break-word;
+}
+
+/* The Range [x - y] */
+.tooltip-range {
+    color: #8b949e;
+    font-family: monospace;
+    font-size: 0.8em;
+    white-space: nowrap; /* Keep [10 - 20] on one line */
+    flex-shrink: 0;      /* Never shrink or wrap the range itself */
+    text-align: right;
+}
+
+.tooltip-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0 8px 0;
+}
+
+/* Description Mode override */
+.tooltip-text.column-mode {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.tooltip-text.column-mode .tooltip-range {
+    align-self: flex-end;
+}

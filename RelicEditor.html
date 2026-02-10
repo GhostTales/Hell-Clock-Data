@@ -177,6 +177,8 @@
     </div>
 </div>
 
+<div id="relicTooltip"></div>
+
 <script>
 class RelicEditor {
     constructor() {
@@ -818,6 +820,11 @@ class RelicEditor {
                 e.stopPropagation(); 
                 this.initDrag(e, item, index, el, 'main');
             };
+
+            el.onmouseenter = (e) => this.showTooltip(e, item);
+            el.onmousemove = (e) => this.moveTooltip(e);
+            el.onmouseleave = () => this.hideTooltip();
+
             el.oncontextmenu = (e) => {
                 e.preventDefault(); 
                 e.stopPropagation();
@@ -901,6 +908,11 @@ class RelicEditor {
                 e.stopPropagation();
                 this.initDrag(e, item, index, el, 'stash');
             };
+
+            el.onmouseenter = (e) => this.showTooltip(e, item);
+            el.onmousemove = (e) => this.moveTooltip(e);
+            el.onmouseleave = () => this.hideTooltip();
+
             el.oncontextmenu = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -929,71 +941,90 @@ class RelicEditor {
         staleRelics.forEach(el => el.remove());
     }
 
-    calculateRealValue(roll, range, level, affixDef) {
-        if (!range) return null;
-
-        const [min, max] = range;
-        const baseVal = min + roll * (max - min);
-        const corrupted = min === max;
-
-        const override =
-            affixDef?.upgradeModifierOverride
-                ? parseFloat(affixDef.upgradeModifierOverride[level] || 0)
-                : null;
-
-        const multiplier =
-            override !== null
-                ? override
-                : this.getUpgradeMultiplier(level, affixDef);
-
-        const config = affixDef?.relicUpgradeModifierConfig || {};
-        const modType = config.modifierType || affixDef?.modifierType || "Additive";
-
-        let finalVal;
-
-        if (corrupted) {
-            if (Number.isInteger(min) && Number.isInteger(max)) {
-                return `${baseVal < 0 ? "" : "+"}${baseVal.toFixed(2)}`;
-            }
-
-            if (modType === "Multiplicative") {
-                finalVal = baseVal * (multiplier || 1);
-                return `${finalVal < 0 ? "" : "+"}${(finalVal * 100).toFixed(2)}%`;
-            }
-
-            finalVal = baseVal + (multiplier || 0);
-
-            // Added Math.abs to checks to handle negative 1.x stats (e.g. -1.5)
-            if (Math.abs(finalVal) >= 1.0 && Math.abs(finalVal) <= 2.0 && Math.abs(max) <= 2.0) {
-                // Subtracts 1.0 for positive, Adds 1.0 for negative to normalize
-                return `${finalVal < 0 ? "" : "+"}${((finalVal - Math.sign(finalVal)) * 100).toFixed(2)}%`;
-            }
-
-            // Added Math.abs to allow negative percentages (e.g. -0.5)
-            if (Math.abs(finalVal) > 0 && Math.abs(finalVal) <= 1.0) {
-                return `${finalVal < 0 ? "" : "+"}${(finalVal * 100).toFixed(2)}%`;
-            }
-
-            return `${finalVal < 0 ? "" : "+"}${finalVal.toFixed(2)}`;
+    calculateRealValue(roll, range, level, def) {
+        // --- 1. Base Value (Interpolation) ---
+        let val = roll;
+        if (range && range.length === 2) {
+            val = range[0] + (range[1] - range[0]) * roll;
         }
 
-        // Non-corrupted
-        if (override !== null) {
-            finalVal = baseVal + override;
+        // --- 2. Upgrade Logic ---
+        const override = def.upgradeModifierOverride 
+            ? parseFloat(def.upgradeModifierOverride[level] || 0) 
+            : null;
+
+        const multiplier = override !== null 
+            ? override 
+            : this.getUpgradeMultiplier(level, def) || 1;
+
+        const config = def.relicUpgradeModifierConfig || {};
+        const upgradeModType = config.modifierType || def.modifierType || "Additive";
+
+        const upgradeModifierConfig = def.relicUpgradeModifierConfig && def.relicUpgradeModifierConfig.length != 0
+
+        if (upgradeModType === "Multiplicative" || upgradeModifierConfig) {
+            val *= multiplier;
         } else {
-            finalVal = baseVal * multiplier;
+            val += multiplier;
         }
 
-        // Normalize 1.x stats (Math.abs added to checks)
-        if (Math.abs(max) <= 2.0 && Math.abs(min) > 1.0) {
-            finalVal -= Math.sign(finalVal);
+        //console.log(val, def.name, def.relicUpgradeModifierConfig)
+
+        // --- 3. Determine Format ---
+        let format = "NoFormat"; 
+        
+        // Priority 1: Check 'eSkillEffectVariableFormat' in behaviorData or variables
+        let vars = [];
+        if (def.behaviorData && def.behaviorData.variables && def.behaviorData.variables.variables) {
+            vars = def.behaviorData.variables.variables;
+        } else if (def.variables && def.variables.variables) {
+            vars = def.variables.variables;
         }
 
-        if (Math.abs(max) <= 2.0) {
-            return `${finalVal < 0 ? "" : "+"}${(finalVal * 100).toFixed(2)}%`;
+        // Find the "Roll" variable or use the first one available
+        const formatVar = vars.find(v => v.name === "Roll") || vars[0];
+        
+        if (formatVar && formatVar.eSkillEffectVariableFormat) {
+            format = formatVar.eSkillEffectVariableFormat;
+        } 
+        // Priority 2: Fallback to 'statModifierType' 
+        else if (def.statModifierType) {
+            format = def.statModifierType; 
         }
 
-        return `${finalVal < 0 ? "" : "+"}${finalVal.toFixed(2)}`;
+        // --- 4. Format Output ---
+        switch (format) {
+            case "Percentage":
+                const pct = Math.abs((val * 100).toFixed(2));
+                return `${pct}%`;
+
+            case "MultiplicativeAdditive":
+                if (val > 1) {
+                    val -= 1;
+                }
+                const multiAddPct = (val * 100).toFixed(2);
+                const multiAddSign = multiAddPct >= 0 ? "+" : ""; 
+                return `${multiAddSign}${multiAddPct}%[+]`;
+
+            case "Multiplicative":
+                return `${parseFloat(((val - 1) * 100).toFixed(2))}%[x]`;
+
+            case "Additive":
+                const addSign = val >= 0 ? "+" : "";
+                if (!Number.isInteger(range[0])) {
+                    return `${addSign}${parseFloat((val * 100).toFixed(2))}%`;
+                }
+                return `${addSign}${parseFloat(val.toFixed(2))}`;
+
+            case "Rounded":
+                // Integer
+                return Math.round(val).toString();
+
+            case "NoFormat":
+            default:
+                // Raw number, no sign forced
+                return parseFloat(val.toFixed(2)).toString();
+        }
     }
 
     toggleLimitUnlock(isChecked) {
@@ -2105,6 +2136,261 @@ class RelicEditor {
         this.dragOffsetX = e.clientX - rect.left;
         this.dragOffsetY = e.clientY - rect.top;
     }
+
+    // --- TOOLTIP LOGIC START ---
+
+    initTooltip() {
+        this.tooltipEl = document.getElementById('relicTooltip');
+    }
+
+    showTooltip(e, item) {
+        if (!this.tooltipEl) this.initTooltip();
+        
+        const def = this.definitions.relics[item._relicBaseDefinitionID];
+        const tier = item._tier || 1;
+        const level = item._upgradeLevel || 0;
+
+        // 1. Header
+        let html = `<div class="tooltip-header">${this.formatRelicDisplay(this.getRelicName(def, tier))}</div>`;
+
+        // --- SORTING LOGIC ---
+        const topList = [];       // Unique & Rare
+        const normalImplicits = []; // Remaining Implicits
+        const normalExplicits = []; // Remaining Explicits
+
+        // Helper to categorize
+        const categorize = (affixList, isImplicit) => {
+            if (!affixList) return;
+            affixList.forEach(wrapper => {
+                // Handle data structure difference (Implicit wraps data in _relicAffixData)
+                const data = isImplicit ? wrapper._relicAffixData : wrapper;
+                const defId = data._relicAffixDefinitionId;
+                const affixDef = this.definitions.affixes[defId];
+
+                const isRareOrUnique = affixDef && (affixDef.eAffixRarity === 'Unique' || affixDef.eAffixRarity === 'Special');
+
+                if (isRareOrUnique) {
+                    topList.push({ data, isImplicit });
+                } else if (isImplicit) {
+                    normalImplicits.push({ data, isImplicit });
+                } else {
+                    normalExplicits.push({ data, isImplicit });
+                }
+            });
+        };
+
+        categorize(item._implicitAffixesData, true);
+        categorize(item._affixesData, false);
+
+        // --- RENDER SECTIONS ---
+        
+        // Section 1: Top (Rare/Unique)
+        if (topList.length > 0) {
+            html += `<div class="tooltip-section">`;
+            topList.forEach(item => {
+                html += this.generateAffixTooltipRow(item.data, level, tier, item.isImplicit);
+            });
+            html += `</div>`;
+        }
+
+        // Divider if needed
+        if (topList.length > 0 && (normalImplicits.length > 0 || normalExplicits.length > 0)) {
+            html += `<div class="tooltip-divider"></div>`;
+        }
+
+        // Section 2: Normal Implicits
+        if (normalImplicits.length > 0) {
+            html += `<div class="tooltip-section">`;
+            normalImplicits.forEach(item => {
+                html += this.generateAffixTooltipRow(item.data, level, tier, true);
+            });
+            html += `</div>`;
+        }
+
+        // Divider if needed between Implicits and Explicits
+        if (normalImplicits.length > 0 && normalExplicits.length > 0) {
+            html += `<div class="tooltip-divider"></div>`;
+        }
+
+        // Section 3: Normal Explicits
+        if (normalExplicits.length > 0) {
+            html += `<div class="tooltip-section">`;
+            normalExplicits.forEach(item => {
+                html += this.generateAffixTooltipRow(item.data, level, tier, false);
+            });
+            html += `</div>`;
+        }
+
+        this.tooltipEl.innerHTML = html;
+        this.tooltipEl.style.display = 'block';
+        this.moveTooltip(e);
+    }
+
+    moveTooltip(e) {
+        if (!this.tooltipEl) return;
+        
+        const offset = 15; // Gap between cursor and tooltip
+        const x = e.clientX + offset;
+        let y = e.clientY + offset;
+
+        // 1. Get dimensions
+        const tooltipRect = this.tooltipEl.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+
+        // 2. Vertical Check (Flip if it hits bottom)
+        // If (Cursor Y + Tooltip Height + Offset) goes past window bottom...
+        if (e.clientY + tooltipRect.height + offset > viewportHeight) {
+            // Position above cursor instead: Cursor Y - Tooltip Height - Offset
+            y = e.clientY - tooltipRect.height - offset;
+        }
+
+        // 3. Horizontal Check (Prevent going off right side)
+        // This is a bonus safety check
+        let finalX = x;
+        if (x + tooltipRect.width > viewportWidth) {
+            finalX = viewportWidth - tooltipRect.width - offset;
+        }
+
+        // 4. Apply positions
+        this.tooltipEl.style.left = `${finalX}px`;
+        this.tooltipEl.style.top = `${y}px`;
+    }
+
+    hideTooltip() {
+        if (this.tooltipEl) {
+            this.tooltipEl.style.display = 'none';
+        }
+    }
+
+    generateAffixTooltipRow(affixData, level, tier, isImplicit) {
+        const defId = affixData._relicAffixDefinitionId;
+        const def = this.definitions.affixes[defId];
+        if (!def) return '';
+
+        const name = this.getAffixName(defId);
+        
+        // --- 1. Calculate Main Value ---
+        const range = this.getAffixRange(defId, tier);
+        const finalValStr = this.calculateRealValue(affixData._rollValue, range, level, def);
+        
+        // --- 2. Calculate Display Range ---
+        let rangeStr = "";
+        if (range) {
+            const [min, max] = range;
+            let minVal = this.calculateRealValue(0, range, level, def);
+            let maxVal = this.calculateRealValue(1, range, level, def);
+            // Strict cleanup
+            minVal = minVal.replace(/[^0-9.-]/g, '');
+            maxVal = maxVal.replace(/[^0-9.-]/g, '');
+            rangeStr = `<span class="tooltip-range">[${minVal} - ${maxVal}]</span>`;
+        }
+
+        // --- 3. Icon & Color Logic ---
+        let iconName = 'UI_AffixBullet.png'; 
+        let colorHex = null;
+        
+        const isRareOrUnique = def.eAffixRarity === 'Unique' || def.eAffixRarity === 'Special';
+        const imgClass = isRareOrUnique ? "tooltip-icon large" : "tooltip-icon";
+        const cats = this.getAffixCategory(defId);
+
+        if (affixData._locked) {
+            iconName = 'UI_AffixBullet-Locked.png';
+        } else if (isRareOrUnique && def.customIcon) {
+            iconName = def.customIcon.endsWith('.png') ? def.customIcon : `${def.customIcon}.png`;
+        } else if (isRareOrUnique && name.includes(' - ')) {
+             let skillName = name.split(' - ')[0].replace(/^The\s+/i, '').replace(/[^a-zA-Z0-9]/g, '');
+             iconName = `IconSkill_${skillName}.png`;
+        } else if (cats.includes(3)) {
+            iconName = 'UI_CorruptedBullet.png';
+            colorHex = '#a371f7';
+        } else if (isImplicit && cats.some(c => c >= 0 && c <= 2)) {
+            iconName = 'UI_AffixBullet3.png';
+            if (cats.includes(0)) colorHex = '#e5534b';
+            else if (cats.includes(1)) colorHex = '#58a6ff';
+            else if (cats.includes(2)) colorHex = '#3fb950';
+        }
+
+        const iconPath = `icons/${iconName}`;
+        let iconHtml = colorHex 
+            ? `<div class="${imgClass} colored" style="background-color: ${colorHex}; -webkit-mask-image: url('${iconPath}'); mask-image: url('${iconPath}');"></div>`
+            : `<img src="${iconPath}" class="${imgClass}" onerror="this.style.display='none'">`;
+
+
+        // --- 4. Content Logic ---
+        let contentHtml = '';
+        let descText = null;
+
+        if ((isRareOrUnique) && def.description) {
+            if (Array.isArray(def.description)) {
+                const enObj = def.description.find(d => d.langCode === 'en') || def.description[0];
+                if (enObj) descText = enObj.langTranslation;
+            } else if (typeof def.description === 'string') {
+                descText = def.description;
+            }
+        } else if (def.eStatDefinition)  {
+            descText = `{0} ${def.eStatDefinition.replace(/([a-z])([A-Z])/g, "$1 $2")}`
+        }
+
+        if (descText) {
+            // --- DESCRIPTION MODE ---
+            descText = descText.replace(/<style="[^"]+">/g, '').replace(/<\/style>/g, '');
+            descText = descText.replace(/<color=(#[a-fA-F0-9]+)>(.*?)<\/color>/g, '<span style="color:$1">$2</span>');
+
+            let varsList = [];
+            if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
+            else if (def.variables?.variables) varsList = def.variables.variables;
+
+            descText = descText.replace(/{(\d+)}/g, (match, indexStr) => {
+                const i = parseInt(indexStr);
+                
+                // {0} -> Main Value
+                if (i === 0) return `<strong>${finalValStr}</strong>`;
+                
+                let v = varsList[i];
+                if (!v && i > 0) v = varsList[i-1];
+
+                if (v) {
+                    // FIX: If variable is "Roll", use calculated value
+                    if (v.name === "Roll") return `<strong>${finalValStr}</strong>`;
+                    
+                    if (typeof v === 'object' && v.baseValue !== undefined) {
+                        let val = v.baseValue;
+                        if (v.eSkillEffectVariableFormat === 'Percentage') val = Math.round(val * 100) + '%';
+                        else if (v.eSkillEffectVariableFormat === 'Rounded') val = Math.round(val);
+                        return `<strong>${val}</strong>`;
+                    }
+                }
+                // Fallback {1} -> {0}
+                if (i === 1) return `<strong>${finalValStr}</strong>`;
+                return match; 
+            });
+
+            descText = descText.replace(/\n/g, '<br>');
+
+            contentHtml = `
+                <div class="tooltip-text column-mode">
+                    <span class="tooltip-desc">${descText}</span>
+                    ${rangeStr}
+                </div>`;
+        } else {
+            // --- STANDARD MODE ---
+            // Uses default flex-row from CSS. Text on left, Range on right.
+            contentHtml = `
+                <div class="tooltip-text">
+                    <span class="tooltip-val"><strong>${finalValStr}</strong> ${name}</span>
+                    ${rangeStr}
+                </div>`;
+        }
+
+        return `
+            <div class="tooltip-row">
+                ${iconHtml}
+                ${contentHtml}
+            </div>
+        `;
+    }
+    // --- TOOLTIP LOGIC END ---
 
 
 
