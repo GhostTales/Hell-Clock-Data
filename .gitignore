@@ -182,3 +182,4 @@ cython_debug/
 /json_data/scene_data
 /.idea
 index_generator.py
+PlayerSave0.json
