@@ -134,6 +134,7 @@ export class TooltipManager {
             iconName = def.customIcon.endsWith('.png') ? def.customIcon : `${def.customIcon}.png`;
         } else if (isRareOrUnique && name.includes(' - ')) {
              let skillName = name.split(' - ')[0].replace(/^The\s+/i, '').replace(/[^a-zA-Z0-9]/g, '');
+             if (skillName === 'VeilofQuills') skillName = 'HomingProjectiles';
              iconName = `IconSkill_${skillName}.png`;
         } else if (cats.includes(3)) {
             iconName = 'UI_CorruptedBullet.png';
