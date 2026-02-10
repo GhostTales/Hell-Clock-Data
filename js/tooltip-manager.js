@@ -8,6 +8,7 @@ export class TooltipManager {
     }
 
     showTooltip(e, item) {
+        if (this.editor.dragManager && this.editor.dragManager.isDragging) return;
         if (!this.tooltipEl) this.tooltipEl = document.getElementById('relicTooltip');
         
         const def = this.editor.dataManager.definitions.relics[item._relicBaseDefinitionID];

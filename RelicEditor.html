@@ -95,7 +95,14 @@
         
     </div>
 
-    <div class="stash-panel">
+    <div class="activity-bar">
+        <div class="activity-tab active" id="tab-stash" onclick="togglePanel('stash')" title="Stash">
+            <img src="icons/Icon_SkillLevel.png" alt="Stash">
+        </div>
+        <!-- Future Reliquary tab will go here -->
+    </div>
+
+    <div class="stash-panel" id="stashPanel">
         <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
             <h4 style="border:none; margin:0; padding:0;">Relic Stash</h4>
             <button onclick="app.openCreationModal()" class="btn-add" style="width: auto; padding: 4px 10px; margin:0; font-size: 0.8em;">Create Relic</button>
@@ -190,6 +197,19 @@
 <div id="relicTooltip"></div>
 
 
+<script>
+    function togglePanel(panelId) {
+        const panel = document.getElementById('stashPanel');
+        const tab = document.getElementById('tab-stash');
+        
+        // Toggle visibility
+        const isHidden = panel.classList.toggle('hidden');
+        
+        // Update active state of the tab
+        if (isHidden) tab.classList.remove('active');
+        else tab.classList.add('active');
+    }
+</script>
 <script type="module" src="js/relic-editor.js"></script>
 </body>
 </html>

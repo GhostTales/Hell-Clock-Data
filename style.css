@@ -1031,6 +1031,44 @@ input[type="checkbox"]:focus {
     text-align: right;
 }
 
+.hidden { display: none !important; }
+
+/* Activity Bar (Vertical Sidebar) */
+.activity-bar {
+    width: 50px;
+    background-color: var(--panel-bg);
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 10px;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.activity-tab {
+    width: 100%;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    font-size: 1.5rem;
+    opacity: 0.5;
+    transition: 0.2s;
+    border-left: 2px solid transparent;
+}
+
+.activity-tab img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.activity-tab:hover { opacity: 1; background-color: rgba(255,255,255,0.05); }
+.activity-tab.active { opacity: 1; border-left-color: var(--accent-color); color: var(--accent-color); }
+
 .tooltip-divider {
     height: 1px;
     background: var(--border-color);

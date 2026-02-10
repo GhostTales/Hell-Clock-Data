@@ -39,6 +39,7 @@ export class DragManager {
             if (dist < 5) return; 
 
             this.isDragging = true;
+            this.editor.tooltipManager.hideTooltip();
             
             const rect = this.dragElement.getBoundingClientRect();
             this.dragOffsetX = this.dragStartX - rect.left;
@@ -347,6 +348,7 @@ export class DragManager {
 
         this.initDrag(e, clone, -1, el, 'copy_mode');
         this.isDragging = true;
+        this.editor.tooltipManager.hideTooltip();
         
         const rect = el.getBoundingClientRect();
         this.dragOffsetX = e.clientX - rect.left;
