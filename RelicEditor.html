@@ -2358,6 +2358,7 @@ class RelicEditor {
                         let val = v.baseValue;
                         if (v.eSkillEffectVariableFormat === 'Percentage') val = Math.round(val * 100) + '%';
                         else if (v.eSkillEffectVariableFormat === 'Rounded') val = Math.round(val);
+                        else if (v.eSkillEffectVariableFormat === 'Multiplicative') val = Math.round((val-1)*100) + '%[x]';
                         return `<strong>${val}</strong>`;
                     }
                 }
