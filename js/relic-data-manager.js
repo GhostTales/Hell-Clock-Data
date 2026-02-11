@@ -7,12 +7,14 @@ export class RelicDataManager {
             save: null,
             relics: null,
             affixes: null,
-            config: null
+            config: null,
+            skillsConfig: null
         };
         
         this.definitions = {
             relics: {}, 
             affixes: {},
+            skills: {},
             defaultUpgradeModifiers: null, 
             fallbackUpgradeModifiers: {
                 "0": 1.0, "1": 1.2, "2": 1.4, "3": 1.6, "4": 1.8,
@@ -42,7 +44,9 @@ export class RelicDataManager {
         const files = [
             { key: 'relics', path: 'json_data/relic_data/Relics.json' },
             { key: 'affixes', path: 'json_data/relic_data/Relic Affixes.json' },
-            { key: 'config', path: 'json_data/relic_data/Relic Inventory Config.json' }
+            { key: 'config', path: 'json_data/relic_data/Relic Inventory Config.json' },
+            { key: 'skillsConfig', path: 'json_data/relic_data/Skills Config.json' },
+            { key: 'skills', path: 'json_data/relic_data/Skills.json' }
         ];
 
         try {
@@ -82,6 +86,12 @@ export class RelicDataManager {
     processDefinitions() {
         this.nonDroppableAffixIds.clear();
         const droppableAffixIds = new Set();
+
+        if (this.data.skills && this.data.skills.Skills) {
+            this.data.skills.Skills.forEach(s => {
+                this.definitions.skills[s.id] = s;
+            });
+        }
 
         if (this.data.relics && this.data.relics.Relics) {
             this.data.relics.Relics.forEach(r => {
@@ -224,6 +234,31 @@ export class RelicDataManager {
     getAffixName(affixId) {
         const def = this.definitions.affixes[affixId];
         if (!def) return `ID: ${affixId}`;
+
+        if (def.skillDefinition && def.skillDefinition.id !== undefined) {
+            const skillId = def.skillDefinition.id;
+            const skillDef = this.definitions.skills[skillId];
+            if (skillDef) {
+                if (skillDef.localizedName && Array.isArray(skillDef.localizedName)) {
+                    const en = skillDef.localizedName.find(k => k.langCode === 'en');
+                    if (en) return en.langTranslation;
+                }
+                if (skillDef.name) return formatString(skillDef.name);
+            }
+        }
+
+        // Prioritize Stat Name for common stat modifiers to avoid flavor names (e.g. "Faith" vs "Mana Regen")
+        if (def.type === 'StatModifierAffixDefinition' && def.eStatDefinition) {
+            // Exception for "All Resistances" which is a composite stat named correctly in localization
+            if (def.nameLocalizationKey && def.nameLocalizationKey.some(k => k.langTranslation === 'All Resistances')) {
+                 const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
+                 if (en) return en.langTranslation;
+            }
+            return this.formatStatName(def.eStatDefinition);
+        }
+        if (def.type === 'RegenOnKillAffixDefinition' && def.eStatRegen) {
+             return this.formatStatName(def.eStatRegen);
+        }
         
         if (def.nameLocalizationKey && Array.isArray(def.nameLocalizationKey)) {
             const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
@@ -233,9 +268,19 @@ export class RelicDataManager {
         if (def.name && !def.name.startsWith("Stat -")) return formatString(def.name);
         
         if (def.eStatDefinition) {
-            return formatString(def.eStatDefinition);
+            return this.formatStatName(def.eStatDefinition);
         }
         return `ID: ${affixId}`;
+    }
+
+    formatStatName(stat) {
+        if (stat === 'MaxBarrier') return 'Max. Conviction';
+        if (stat === 'BarrierDecayResilience') return 'Conviction Decay Resistance';
+        if (stat === 'SkillManaCost') return 'Mana Cost';
+        
+        let name = stat;
+        if (name.startsWith('Additional')) name = name.replace('Additional', '');
+        return formatString(name);
     }
 
     getAffixRange(affixId, tier) {
@@ -268,6 +313,13 @@ export class RelicDataManager {
             return affixDef.relicUpgradeModifierConfig.upgradeModifierOverride;
         }
         return null;
+    }
+
+    getMaxSkillUpgradeLevelBonus() {
+        if (this.data.skillsConfig && this.data.skillsConfig.maxSkillUpgradeLevelBonus !== undefined) {
+            return this.data.skillsConfig.maxSkillUpgradeLevelBonus;
+        }
+        return 0;
     }
 
     getImplicitCategoryName(catId) {

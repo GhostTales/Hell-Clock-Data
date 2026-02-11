@@ -323,7 +323,11 @@ export class RelicInspector {
             
             if (isImplicit) {
                 if (loopIndex >= 3) div.style.opacity = '0.6';
-                const cats = dataManager.getAffixCategory(defId);
+                
+                // Use stored category to match in-game behavior, default to 0 (Fury) if missing
+                const currentCat = (itemWrapper._eImplicitAffixCategory !== undefined && itemWrapper._eImplicitAffixCategory !== null) ? itemWrapper._eImplicitAffixCategory : 0;
+                const cats = [currentCat];
+                
                 const colors = cats.map(c => catColors[c] || catColors[-1]);
                 
                 if (colors.length > 1) {
@@ -406,7 +410,16 @@ export class RelicInspector {
                     this.editor.modals.openAffixModal(defId, (newId) => {
                         const parsedId = parseInt(newId);
                         affixData._relicAffixDefinitionId = parsedId;
-                        if (isImplicit) itemWrapper._eImplicitAffixCategory = null; 
+                        if (isImplicit) {
+                            const cats = dataManager.getAffixCategory(parsedId);
+                            if (cats.length > 0) {
+                                if (itemWrapper._eImplicitAffixCategory === null || itemWrapper._eImplicitAffixCategory === undefined || !cats.includes(itemWrapper._eImplicitAffixCategory)) {
+                                    itemWrapper._eImplicitAffixCategory = cats[0];
+                                }
+                            } else {
+                                itemWrapper._eImplicitAffixCategory = 0;
+                            }
+                        }
                         this.renderInspector();
                     });
                 };
@@ -499,6 +512,37 @@ export class RelicInspector {
 
             controls.appendChild(slider);
             controls.appendChild(numInput);
+
+            if (isImplicit) {
+                const catSelect = document.createElement('select');
+                catSelect.className = 'input-standard';
+                catSelect.style.width = 'auto';
+                catSelect.style.marginLeft = '5px';
+                catSelect.style.fontSize = '0.8em';
+                catSelect.style.padding = '2px';
+                catSelect.title = "Implicit Category";
+
+                const categories = [
+                    { id: 0, name: 'Fury' },
+                    { id: 1, name: 'Faith' },
+                    { id: 2, name: 'Discipline' },
+                    { id: 3, name: 'Corrupted' }
+                ];
+
+                categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.id;
+                    opt.text = cat.name;
+                    if ((itemWrapper._eImplicitAffixCategory || 0) === cat.id) opt.selected = true;
+                    catSelect.appendChild(opt);
+                });
+
+                catSelect.onchange = (e) => {
+                    itemWrapper._eImplicitAffixCategory = parseInt(e.target.value);
+                    this.renderInspector();
+                };
+                controls.appendChild(catSelect);
+            }
 
             if (allowRemove && !isStrictlyUnique) {
                 const btnRemove = document.createElement('button');

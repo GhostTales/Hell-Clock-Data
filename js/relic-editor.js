@@ -165,7 +165,13 @@ class RelicEditor {
                 alert("Implicit limit reached (Max 2).");
                 return;
             }
-            item._implicitAffixesData.push({ _relicAffixData: newAffix });
+
+            let category = 0;
+            if (idToUse !== 0) {
+                const cats = this.dataManager.getAffixCategory(idToUse);
+                if (cats.length > 0) category = cats[0];
+            }
+            item._implicitAffixesData.push({ _relicAffixData: newAffix, _eImplicitAffixCategory: category });
         } else {
             if (!item._affixesData) item._affixesData = [];
             item._affixesData.push(newAffix);

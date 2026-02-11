@@ -132,8 +132,8 @@ export class TooltipManager {
             iconName = 'UI_AffixBullet-Locked.png';
         } else if (isRareOrUnique && def.customIcon) {
             iconName = def.customIcon.endsWith('.png') ? def.customIcon : `${def.customIcon}.png`;
-        } else if (isRareOrUnique && name.includes(' - ')) {
-             let skillName = name.split(' - ')[0].replace(/^The\s+/i, '').replace(/[^a-zA-Z0-9]/g, '');
+        } else if (isRareOrUnique && def.name && def.name.includes(' - ')) {
+             let skillName = def.name.split(' - ')[0].replace(/^The\s+/i, '').replace(/[^a-zA-Z0-9]/g, '');
              if (skillName === 'VeilofQuills') skillName = 'HomingProjectiles';
              iconName = `IconSkill_${skillName}.png`;
         } else if (cats.includes(3)) {
@@ -154,15 +154,13 @@ export class TooltipManager {
         let contentHtml = '';
         let descText = null;
 
-        if ((isRareOrUnique) && def.description) {
+        if (def.description) {
             if (Array.isArray(def.description)) {
                 const enObj = def.description.find(d => d.langCode === 'en') || def.description[0];
                 if (enObj) descText = enObj.langTranslation;
             } else if (typeof def.description === 'string') {
                 descText = def.description;
             }
-        } else if (def.eStatDefinition)  {
-            descText = `{0} ${def.eStatDefinition.replace(/([a-z])([A-Z])/g, "$1 $2")}`
         }
 
         if (descText) {
@@ -170,29 +168,49 @@ export class TooltipManager {
             descText = descText.replace(/<style="[^"]+">/g, '').replace(/<\/style>/g, '');
             descText = descText.replace(/<color=(#[a-fA-F0-9]+)>(.*?)<\/color>/g, '<span style="color:$1">$2</span>');
 
-            let varsList = [];
-            if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
-            else if (def.variables?.variables) varsList = def.variables.variables;
+            const affixName = this.editor.dataManager.getAffixName(defId);
 
             descText = descText.replace(/{(\d+)}/g, (match, indexStr) => {
                 const i = parseInt(indexStr);
-                if (i === 0) return `<strong>${finalValStr}</strong>`;
                 
-                let v = varsList[i];
-                if (!v && i > 0) v = varsList[i-1];
-
-                if (v) {
-                    if (v.name === "Roll") return `<strong>${finalValStr}</strong>`;
-                    if (typeof v === 'object' && v.baseValue !== undefined) {
-                        let val = v.baseValue;
-                        if (v.eSkillEffectVariableFormat === 'Percentage') val = Math.round(val * 100) + '%';
-                        else if (v.eSkillEffectVariableFormat === 'Rounded') val = Math.round(val);
-                        else if (v.eSkillEffectVariableFormat === 'Multiplicative') val = Math.round((val-1)*100) + '%[x]';
-                        return `<strong>${val}</strong>`;
+                if (def.type === 'StatModifierAffixDefinition' || def.type === 'SkillLevelAffixDefinition') {
+                    if (i === 0) return affixName;
+                    if (i === 1) return `<strong>${finalValStr}</strong>`;
+                    if (i === 2) {
+                        if (def.type === 'SkillLevelAffixDefinition') {
+                            return `<strong>${this.editor.dataManager.getMaxSkillUpgradeLevelBonus()}</strong>`;
+                        } else if (def.additionalStatModifierDefinitions && def.additionalStatModifierDefinitions.length > 0) {
+                            return ` / ${this.editor.dataManager.formatStatName(def.additionalStatModifierDefinitions[0].eStatDefinition)}`;
+                        }
                     }
+                    return ""; 
+                } else if (def.type === 'RegenOnKillAffixDefinition' || def.type === 'StatusMaxStacksAffixDefinition') {
+                    if (i === 0) return `<strong>${finalValStr}</strong>`;
+                    if (i === 1) return affixName;
+                    return "";
+                } else {
+                    if (i === 0) return `<strong>${finalValStr}</strong>`;
+                    
+                    let varsList = [];
+                    if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
+                    else if (def.variables?.variables) varsList = def.variables.variables;
+
+                    let v = varsList[i];
+                    if (!v && i > 0) v = varsList[i-1];
+
+                    if (v) {
+                        if (v.name === "Roll") return `<strong>${finalValStr}</strong>`;
+                        if (typeof v === 'object' && v.baseValue !== undefined) {
+                            let val = v.baseValue;
+                            if (v.eSkillEffectVariableFormat === 'Percentage') val = Math.round(val * 100) + '%';
+                            else if (v.eSkillEffectVariableFormat === 'Rounded') val = Math.round(val);
+                            else if (v.eSkillEffectVariableFormat === 'Multiplicative') val = Math.round((val-1)*100) + '%[x]';
+                            return `<strong>${val}</strong>`;
+                        }
+                    }
+                    if (i === 1) return `<strong>${finalValStr}</strong>`;
+                    return match; 
                 }
-                if (i === 1) return `<strong>${finalValStr}</strong>`;
-                return match; 
             });
 
             descText = descText.replace(/\n/g, '<br>');
@@ -203,9 +221,10 @@ export class TooltipManager {
                     ${rangeStr}
                 </div>`;
         } else {
+            const nameStr = def ? formatString(def.name) : `ID: ${defId}`;
             contentHtml = `
                 <div class="tooltip-text">
-                    <span class="tooltip-val"><strong>${finalValStr}</strong> ${name}</span>
+                    <span class="tooltip-val"><strong>${finalValStr}</strong> ${nameStr}</span>
                     ${rangeStr}
                 </div>`;
         }
