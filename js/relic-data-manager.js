@@ -38,6 +38,12 @@ export class RelicDataManager {
         this.affixCategoryMap = {};
         this.affixPoolMap = {};
         this.nonDroppableAffixIds = new Set();
+
+        this.statOverrides = {
+            'MaxBarrier': 'Max. Conviction',
+            'BarrierDecayResilience': 'Conviction Decay Resistance',
+            'SkillManaCost': 'Mana Cost'
+        };
     }
 
     async initAutoLoad() {
@@ -274,9 +280,7 @@ export class RelicDataManager {
     }
 
     formatStatName(stat) {
-        if (stat === 'MaxBarrier') return 'Max. Conviction';
-        if (stat === 'BarrierDecayResilience') return 'Conviction Decay Resistance';
-        if (stat === 'SkillManaCost') return 'Mana Cost';
+        if (this.statOverrides[stat]) return this.statOverrides[stat];
         
         let name = stat;
         if (name.startsWith('Additional')) name = name.replace('Additional', '');
