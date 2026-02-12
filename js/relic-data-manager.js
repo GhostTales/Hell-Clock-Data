@@ -234,12 +234,6 @@ export class RelicDataManager {
             // Use BoughtPages as minimum count, or at least 1
             let pageCount = this.data.save.externalInventorySaveData.BoughtPages || 1;
             
-            // Expand if we have items on further pages
-            this.reliquaryItems.forEach(item => {
-                const p = item._pageIndex || 0;
-                if (p + 1 > pageCount) pageCount = p + 1;
-            });
-
             for (let i = 0; i < pageCount; i++) {
                 pagesList.push({ Items: [] });
             }

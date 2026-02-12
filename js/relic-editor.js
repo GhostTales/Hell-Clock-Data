@@ -43,14 +43,24 @@ class RelicEditor {
     }
 
     prevReliquaryPage() {
-        if (this.reliquaryPage > 0) {
-            this.reliquaryPage--;
-            this.renderReliquary();
+        let maxPages = 1;
+        if (this.dataManager.data.save && this.dataManager.data.save.externalInventorySaveData) {
+            maxPages = this.dataManager.data.save.externalInventorySaveData.BoughtPages + 3 || 1;
         }
+
+        this.reliquaryPage--;
+        if (this.reliquaryPage <= 0) this.reliquaryPage = maxPages - 1;
+        this.renderReliquary();
     }
 
     nextReliquaryPage() {
+        let maxPages = 1;
+        if (this.dataManager.data.save && this.dataManager.data.save.externalInventorySaveData) {
+            maxPages = this.dataManager.data.save.externalInventorySaveData.BoughtPages + 3 || 1;
+        }
+
         this.reliquaryPage++;
+        if (this.reliquaryPage >= maxPages) this.reliquaryPage = 0;
         this.renderReliquary();
     }
 

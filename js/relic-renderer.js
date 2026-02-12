@@ -120,12 +120,11 @@ export class RelicRenderer {
         // Update Page Display
         const pageDisplay = document.getElementById('reliquaryPageDisplay');
         if (pageDisplay) {
-            // Calculate max pages based on items, defaulting to at least 1
-            let maxPage = 0;
-            dataManager.reliquaryItems.forEach(item => {
-                if (item._pageIndex > maxPage) maxPage = item._pageIndex;
-            });
-            pageDisplay.textContent = `${this.editor.reliquaryPage + 1} / ${maxPage + 1}`;
+            let totalPages = 1;
+            if (dataManager.data.save && dataManager.data.save.externalInventorySaveData) {
+                totalPages = dataManager.data.save.externalInventorySaveData.BoughtPages + 3 || 1;
+            }
+            pageDisplay.textContent = `${this.editor.reliquaryPage + 1} / ${totalPages}`;
         }
 
         const currentRelics = container.querySelectorAll('.relic-item');
