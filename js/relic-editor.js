@@ -15,6 +15,7 @@ class RelicEditor {
         this.dragManager = new DragManager(this);
         
         this.currentLoadoutIndex = 0;
+        this.reliquaryPage = 0;
         this.selectedRelicIndex = -1;
         this.selectedContainer = 'main'; // 'main' or 'stash'
         
@@ -37,8 +38,20 @@ class RelicEditor {
         this.renderer.renderGrid();
     }
 
-    renderStash() {
-        this.renderer.renderStash();
+    renderReliquary() {
+        this.renderer.renderReliquary();
+    }
+
+    prevReliquaryPage() {
+        if (this.reliquaryPage > 0) {
+            this.reliquaryPage--;
+            this.renderReliquary();
+        }
+    }
+
+    nextReliquaryPage() {
+        this.reliquaryPage++;
+        this.renderReliquary();
     }
 
     renderInspector() {
@@ -126,7 +139,7 @@ class RelicEditor {
 
     getSelectedItem() {
         if (this.selectedRelicIndex === -1) return null;
-        if (this.selectedContainer === 'stash') return this.dataManager.stashItems[this.selectedRelicIndex];
+        if (this.selectedContainer === 'reliquary') return this.dataManager.reliquaryItems[this.selectedRelicIndex];
         if (this.currentLoadoutIndex !== -1 && this.dataManager.data.save) {
             const loadout = this.dataManager.data.save._relicLoadoutsSaveData._loadouts[this.currentLoadoutIndex];
             if (loadout && loadout.Items) return loadout.Items[this.selectedRelicIndex];

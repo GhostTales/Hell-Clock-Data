@@ -135,6 +135,9 @@ export class TooltipManager {
         } else if (isRareOrUnique && def.name && def.name.includes(' - ')) {
              let skillName = def.name.split(' - ')[0].replace(/^The\s+/i, '').replace(/[^a-zA-Z0-9]/g, '');
              if (skillName === 'VeilofQuills') skillName = 'HomingProjectiles';
+             if (skillName === 'Matadeira') skillName = 'EnemyCannons';
+             if (skillName === 'Bombardment') skillName = 'RainOfHeads';
+             if (skillName === 'SummonMarksmen') skillName = 'PhantomMarksmen';
              iconName = `IconSkill_${skillName}.png`;
         } else if (cats.includes(3)) {
             iconName = 'UI_CorruptedBullet.png';

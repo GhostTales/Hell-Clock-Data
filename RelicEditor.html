@@ -96,22 +96,28 @@
     </div>
 
     <div class="activity-bar">
-        <div class="activity-tab active" id="tab-stash" onclick="togglePanel('stash')" title="Stash">
-            <img src="icons/Icon_SkillLevel.png" alt="Stash">
+        <div class="activity-tab active" id="tab-reliquary" onclick="togglePanel('reliquary')" title="Reliquary">
+            <img src="icons/Icon_RelicarySize_Increase.png" alt="Reliquary">
         </div>
-        <!-- Future Reliquary tab will go here -->
+        <div class="activity-tab" onclick="app.openCreationModal()" title="Create Relic">
+            <strong style="font-size: 1.5em; color: var(--text-color);">+</strong>
+        </div>
     </div>
 
-    <div class="stash-panel" id="stashPanel">
+    <div class="stash-panel" id="reliquaryPanel">
         <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
-            <h4 style="border:none; margin:0; padding:0;">Relic Stash</h4>
-            <button onclick="app.openCreationModal()" class="btn-add" style="width: auto; padding: 4px 10px; margin:0; font-size: 0.8em;">Create Relic</button>
+            <h4 style="border:none; margin:0; padding:0;">Reliquary</h4>
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <button class="btn-add" style="width: 24px; padding: 2px 0; font-size: 0.8em;" onclick="app.prevReliquaryPage()" title="Previous Page">&lt;</button>
+                <span id="reliquaryPageDisplay" style="font-size: 0.8em; color: var(--text-muted); min-width: 40px; text-align: center;">1 / 1</span>
+                <button class="btn-add" style="width: 24px; padding: 2px 0; font-size: 0.8em;" onclick="app.nextReliquaryPage()" title="Next Page">&gt;</button>
+            </div>
         </div>
         <p style="font-size:0.8em; color:#8b949e; margin-top:-10px;">
-            Drag items here to store them. Items in stash are NOT exported.
+            External inventory (saved).
         </p>
-        <div id="stashContainer" class="stash-grid"></div>
-        <div id="trashZone" class="trash-zone">
+        <div id="reliquaryContainer" class="stash-grid"></div>
+        <div id="reliquaryTrashZone" class="trash-zone">
             Drop here to delete
         </div>
     </div>
@@ -198,16 +204,25 @@
 
 
 <script>
-    function togglePanel(panelId) {
-        const panel = document.getElementById('stashPanel');
-        const tab = document.getElementById('tab-stash');
+    function togglePanel(panelName) {
+        const panels = ['reliquary'];
         
-        // Toggle visibility
-        const isHidden = panel.classList.toggle('hidden');
+        // Determine if we are closing the currently active panel
+        const activeTab = document.querySelector('.activity-tab.active');
+        const isClosing = activeTab && activeTab.id === 'tab-' + panelName;
+
+        // Hide all
+        panels.forEach(p => {
+            document.getElementById(p + 'Panel').classList.add('hidden');
+            document.getElementById('tab-' + p).classList.remove('active');
+        });
         
-        // Update active state of the tab
-        if (isHidden) tab.classList.remove('active');
-        else tab.classList.add('active');
+        // If not closing, open the requested one
+        if (!isClosing) {
+            document.getElementById(panelName + 'Panel').classList.remove('hidden');
+            document.getElementById('tab-' + panelName).classList.add('active');
+            if (panelName === 'reliquary' && window.app) window.app.renderReliquary();
+        }
     }
 </script>
 <script type="module" src="js/relic-editor.js"></script>

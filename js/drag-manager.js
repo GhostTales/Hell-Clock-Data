@@ -66,18 +66,15 @@ export class DragManager {
             this.dragElement.style.left = `${mx - this.dragOffsetX}px`;
             this.dragElement.style.top = `${my - this.dragOffsetY}px`;
 
-            const stashRect = document.getElementById('stashContainer').getBoundingClientRect();
             const mainRect = document.getElementById('gridContainer').getBoundingClientRect();
-
-            const stashCenterX = stashRect.left + stashRect.width / 2;
             const mainCenterX = mainRect.left + mainRect.width / 2;
-
-            let t = (mx - stashCenterX) / (mainCenterX - stashCenterX);
-            t = Math.max(0, Math.min(1, t));
 
             const startSize = this.editor.dataManager.stashCellSize;
             const endSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
-            const currentCellSize = startSize + t * (endSize - startSize);
+            
+            // Simple logic: if over main grid, use main size, else use stash size (reliquary)
+            const isOverMain = (mx >= mainRect.left && mx <= mainRect.right && my >= mainRect.top && my <= mainRect.bottom);
+            const currentCellSize = isOverMain ? endSize : startSize;
 
             const w = this.dragItemSize.w;
             const h = this.dragItemSize.h;
@@ -89,13 +86,15 @@ export class DragManager {
             this.dragElement.style.width = `${newPixelW}px`;
             this.dragElement.style.height = `${newPixelH}px`;
 
-            const trash = document.getElementById('trashZone');
-            const r = trash.getBoundingClientRect();
-            if (e.clientX >= r.left && e.clientX <= r.right && 
-                e.clientY >= r.top && e.clientY <= r.bottom) {
-                trash.classList.add('drag-over');
-            } else {
-                trash.classList.remove('drag-over');
+            const trash = document.getElementById('reliquaryTrashZone');
+            if (trash) {
+                const r = trash.getBoundingClientRect();
+                if (e.clientX >= r.left && e.clientX <= r.right && 
+                    e.clientY >= r.top && e.clientY <= r.bottom) {
+                    trash.classList.add('drag-over');
+                } else {
+                    trash.classList.remove('drag-over');
+                }
             }
         }
     }
@@ -104,7 +103,8 @@ export class DragManager {
         document.removeEventListener('mousemove', this.boundMouseMove);
         document.removeEventListener('mouseup', this.boundMouseUp);
         
-        document.getElementById('trashZone').classList.remove('drag-over');
+        const trash = document.getElementById('reliquaryTrashZone');
+        if (trash) trash.classList.remove('drag-over');
 
         if (!this.isDragging) {
             if (this.dragSource === 'copy_mode') {
@@ -122,8 +122,8 @@ export class DragManager {
         this.dragElement.remove();
 
         const mainGrid = document.getElementById('gridContainer');
-        const stashGrid = document.getElementById('stashContainer');
-        const trashZone = document.getElementById('trashZone');
+        const reliquaryGrid = document.getElementById('reliquaryContainer');
+        const reliquaryTrashZone = document.getElementById('reliquaryTrashZone');
 
         const mx = e.clientX;
         const my = e.clientY;
@@ -133,9 +133,9 @@ export class DragManager {
 
         if (isInside(mainGrid.getBoundingClientRect())) {
             targetType = 'main';
-        } else if (isInside(stashGrid.getBoundingClientRect())) {
-            targetType = 'stash';
-        } else if (isInside(trashZone.getBoundingClientRect())) {
+        } else if (reliquaryGrid && !reliquaryGrid.closest('.hidden') && isInside(reliquaryGrid.getBoundingClientRect())) {
+            targetType = 'reliquary';
+        } else if (reliquaryTrashZone && !reliquaryTrashZone.closest('.hidden') && isInside(reliquaryTrashZone.getBoundingClientRect())) {
             targetType = 'trash';
         }
 
@@ -161,8 +161,8 @@ export class DragManager {
             if (this.dragSource === 'main') {
                 const loadout = this.editor.dataManager.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
                 loadout.Items.splice(this.dragIndex, 1);
-            } else if (this.dragSource === 'stash') {
-                this.editor.dataManager.stashItems.splice(this.dragIndex, 1);
+            } else if (this.dragSource === 'reliquary') {
+                this.editor.dataManager.reliquaryItems.splice(this.dragIndex, 1);
             }
             
             this.editor.selectedRelicIndex = -1;
@@ -171,8 +171,11 @@ export class DragManager {
             return;
         }
 
-        const isStash = (targetType === 'stash');
-        const container = isStash ? document.getElementById('stashContainer') : document.getElementById('gridContainer');
+        const isStash = (targetType === 'reliquary');
+        let container;
+        if (targetType === 'reliquary') container = document.getElementById('reliquaryContainer');
+        else container = document.getElementById('gridContainer');
+
         const rect = container.getBoundingClientRect();
         
         let targetCellSize;
@@ -204,10 +207,11 @@ export class DragManager {
         const def = this.editor.dataManager.definitions.relics[this.dragItem._relicBaseDefinitionID];
         const size = this.editor.dataManager.getRelicSize(def);
 
-        if (isStash) {
-            gridW = this.editor.dataManager.stashWidth;
-            gridH = this.editor.dataManager.stashHeight;
-            targetArray = this.editor.dataManager.stashItems;
+        if (targetType === 'reliquary') {
+            gridW = 7; // Reliquary Width
+            gridH = 10; // Reliquary Height
+            targetArray = this.editor.dataManager.reliquaryItems.filter(i => i._pageIndex === this.editor.reliquaryPage);
+            finalDataY = gridH - visualY - size.h;
         } else {
             gridW = currentShape.width;
             gridH = currentShape.height;
@@ -252,22 +256,28 @@ export class DragManager {
         if (this.dragSource !== 'copy_mode') {
             if (this.dragSource === 'main') {
                 loadout.Items.splice(this.dragIndex, 1);
-            } else if (this.dragSource === 'stash') {
-                this.editor.dataManager.stashItems.splice(this.dragIndex, 1);
+            } else if (this.dragSource === 'reliquary') {
+                this.editor.dataManager.reliquaryItems.splice(this.dragIndex, 1);
             }
         }
 
         this.dragItem._position.x = targetX;
         this.dragItem._position.y = finalDataY;
+        
+        if (targetType === 'reliquary') {
+            this.dragItem._pageIndex = this.editor.reliquaryPage;
+        }
 
         if (targetType === 'main') {
             loadout.Items.push(this.dragItem);
         } else {
-            this.editor.dataManager.stashItems.push(this.dragItem);
+            this.editor.dataManager.reliquaryItems.push(this.dragItem);
         }
 
         this.editor.selectedContainer = targetType;
-        this.editor.selectedRelicIndex = (targetType === 'main' ? loadout.Items.length : this.editor.dataManager.stashItems.length) - 1;
+        
+        if (targetType === 'main') this.editor.selectedRelicIndex = loadout.Items.length - 1;
+        else this.editor.selectedRelicIndex = this.editor.dataManager.reliquaryItems.length - 1;
 
         this.editor.renderer.renderGrid();
         this.editor.inspector.renderInspector();
@@ -283,10 +293,9 @@ export class DragManager {
         const item = record.item;
         
         let targetArray;
-        const isStash = (record.source === 'stash');
 
-        if (isStash) {
-            targetArray = this.editor.dataManager.stashItems;
+        if (record.source === 'reliquary') {
+            targetArray = this.editor.dataManager.reliquaryItems;
         } else {
             const loadout = this.editor.dataManager.data.save._relicLoadoutsSaveData._loadouts[this.editor.currentLoadoutIndex];
             targetArray = loadout.Items;
@@ -296,6 +305,8 @@ export class DragManager {
         const size = this.editor.dataManager.getRelicSize(def);
         
         const isBlocked = targetArray.some(other => {
+            if (record.source === 'reliquary' && other._pageIndex !== item._pageIndex) return false;
+            
             const oDef = this.editor.dataManager.definitions.relics[other._relicBaseDefinitionID];
             const oSize = this.editor.dataManager.getRelicSize(oDef);
             

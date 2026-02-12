@@ -88,37 +88,55 @@ export class RelicRenderer {
         const staleRelics = container.querySelectorAll('.relic-item[data-stale="true"]');
         staleRelics.forEach(el => el.remove());
 
-        this.renderStash();
+        this.renderReliquary();
     }
 
-    renderStash() {
+    renderReliquary() {
         const dataManager = this.editor.dataManager;
-        const container = document.getElementById('stashContainer');
-        
-        const totalSlots = dataManager.stashWidth * dataManager.stashHeight;
-        const existingSlots = container.querySelectorAll('.grid-slot');
+        const container = document.getElementById('reliquaryContainer');
+        if (!container) return;
 
+        // Reliquary Grid Configuration (7 columns x 10 rows = 70 items per page)
+        const cols = 7;
+        const rows = 10;
+        const totalSlots = cols * rows;
+        const cellSize = dataManager.stashCellSize;
+        
+        const existingSlots = container.querySelectorAll('.grid-slot');
         if (existingSlots.length !== totalSlots) {
             container.innerHTML = '';
-            container.style.gridTemplateColumns = `repeat(${dataManager.stashWidth}, ${dataManager.stashCellSize}px)`;
-            container.style.gridTemplateRows = `repeat(${dataManager.stashHeight}, ${dataManager.stashCellSize}px)`;
+            container.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+            container.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
             
             for(let i=0; i<totalSlots; i++) {
                 const div = document.createElement('div');
                 div.className = 'grid-slot';
-                div.style.width = `${dataManager.stashCellSize}px`;
-                div.style.height = `${dataManager.stashCellSize}px`;
+                div.style.width = `${cellSize}px`;
+                div.style.height = `${cellSize}px`;
                 container.appendChild(div);
             }
+        }
+
+        // Update Page Display
+        const pageDisplay = document.getElementById('reliquaryPageDisplay');
+        if (pageDisplay) {
+            // Calculate max pages based on items, defaulting to at least 1
+            let maxPage = 0;
+            dataManager.reliquaryItems.forEach(item => {
+                if (item._pageIndex > maxPage) maxPage = item._pageIndex;
+            });
+            pageDisplay.textContent = `${this.editor.reliquaryPage + 1} / ${maxPage + 1}`;
         }
 
         const currentRelics = container.querySelectorAll('.relic-item');
         currentRelics.forEach(el => el.dataset.stale = "true");
 
-        const cellSize = dataManager.stashCellSize;
         const gap = 4;
+        const currentPage = this.editor.reliquaryPage;
 
-        dataManager.stashItems.forEach((item, index) => {
+        dataManager.reliquaryItems.forEach((item, index) => {
+            if (item._pageIndex !== currentPage) return;
+
             const def = dataManager.definitions.relics[item._relicBaseDefinitionID];
             const size = dataManager.getRelicSize(def);
             const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
@@ -134,27 +152,23 @@ export class RelicRenderer {
 
             el.onmousedown = (e) => {
                 e.stopPropagation();
-                this.editor.dragManager.initDrag(e, item, index, el, 'stash');
+                this.editor.dragManager.initDrag(e, item, index, el, 'reliquary');
             };
 
             el.onmouseenter = (e) => this.editor.tooltipManager.showTooltip(e, item);
             el.onmousemove = (e) => this.editor.tooltipManager.moveTooltip(e);
             el.onmouseleave = () => this.editor.tooltipManager.hideTooltip();
-
-            el.oncontextmenu = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.editor.dragManager.startCopy(e, item);
-            };
+            el.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); this.editor.dragManager.startCopy(e, item); };
 
             el.dataset.stale = "false";
             el.dataset.index = index;
 
-            const isSelected = (this.editor.selectedContainer === 'stash' && index === this.editor.selectedRelicIndex);
+            const isSelected = (this.editor.selectedContainer === 'reliquary' && index === this.editor.selectedRelicIndex);
             el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
 
+            const visualY = rows - item._position.y - size.h;
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
-            el.style.top = `${item._position.y * (cellSize + gap) + 10}px`;
+            el.style.top = `${visualY * (cellSize + gap) + 10}px`;
             el.style.width = `${size.w * cellSize + (size.w - 1) * gap}px`;
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 

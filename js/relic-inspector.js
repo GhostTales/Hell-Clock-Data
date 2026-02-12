@@ -99,7 +99,6 @@ export class RelicInspector {
             });
             this.renderInspector();
             this.editor.renderer.renderGrid();
-            this.editor.renderer.renderStash();
         }));
 
         let rarityOpts = [];
@@ -319,6 +318,113 @@ export class RelicInspector {
             const div = document.createElement('div');
             div.className = 'affix-item';
             
+            const isStrictlyUnique = def && def.eAffixRarity === 'Unique';
+            const isRare = def && def.eAffixRarity === 'Special';
+
+            let descDiv = null;
+
+            const updateDescription = () => {
+                if (!descDiv) return;
+                
+                let descText = null;
+                if (Array.isArray(def.description)) {
+                    const enObj = def.description.find(d => d.langCode === 'en') || def.description[0];
+                    if (enObj) descText = enObj.langTranslation;
+                } else if (typeof def.description === 'string') {
+                    descText = def.description;
+                }
+
+                if (descText) {
+                    descText = descText.replace(/<style="[^"]+">/g, '').replace(/<\/style>/g, '');
+                    descText = descText.replace(/<color=(#[a-fA-F0-9]+)>(.*?)<\/color>/g, '<span style="color:$1">$2</span>');
+                    const finalValStr = dataManager.calculateRealValue(affixData._rollValue, range, level, def);
+                    const affixName = dataManager.getAffixName(defId);
+
+                    descText = descText.replace(/{(\d+)}/g, (match, indexStr) => {
+                        const i = parseInt(indexStr);
+                        
+                        if (def.type === 'StatModifierAffixDefinition' || def.type === 'SkillLevelAffixDefinition') {
+                            if (i === 0) return affixName;
+                            if (i === 1) return `<strong>${finalValStr}</strong>`;
+                            if (i === 2) {
+                                if (def.type === 'SkillLevelAffixDefinition') {
+                                    return `<strong>${dataManager.getMaxSkillUpgradeLevelBonus()}</strong>`;
+                                } else if (def.additionalStatModifierDefinitions && def.additionalStatModifierDefinitions.length > 0) {
+                                    return ` / ${dataManager.formatStatName(def.additionalStatModifierDefinitions[0].eStatDefinition)}`;
+                                }
+                            }
+                            return ""; 
+                        } else if (def.type === 'RegenOnKillAffixDefinition' || def.type === 'StatusMaxStacksAffixDefinition') {
+                            if (i === 0) return `<strong>${finalValStr}</strong>`;
+                            if (i === 1) return affixName;
+                            return "";
+                        } else {
+                            // {0} is always the main value (Roll)
+                            if (i === 0) return `<strong>${finalValStr}</strong>`;
+                            
+                            // Handle {1}, {2}, etc. via additionalLocalizationVariables mapping
+                            if (def.additionalLocalizationVariables && def.additionalLocalizationVariables[i - 1]) {
+                                const locVar = def.additionalLocalizationVariables[i - 1];
+                                const targetName = locVar.skillEffectVariableReference?.name;
+                                
+                                let varsList = [];
+                                if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
+                                else if (def.variables?.variables) varsList = def.variables.variables;
+
+                                const targetVar = varsList.find(v => v.name === targetName);
+                                if (targetVar && targetVar.baseValue !== undefined) {
+                                    let val = targetVar.baseValue;
+                                    const format = locVar.valueFormatOverride || targetVar.eSkillEffectVariableFormat;
+                                    
+                                    if (format === 'Percentage') val = Math.round(val * 100) + '%';
+                                    else if (format === 'Rounded') val = Math.round(val);
+                                    else if (format === 'Multiplicative') val = Math.round((val - 1) * 100) + '%[x]';
+                                    
+                                    return `<strong>${val}</strong>`;
+                                }
+                            }
+
+                            // Fallback: Try to find variable by index if not found in additional map
+                            let varsList = [];
+                            if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
+                            else if (def.variables?.variables) varsList = def.variables.variables;
+
+                            let v = varsList[i];
+                            if (!v && i > 0) v = varsList[i-1];
+
+                            if (v) {
+                                if (v.name === "Roll") return `<strong>${finalValStr}</strong>`;
+                                if (typeof v === 'object' && v.baseValue !== undefined) {
+                                    let val = v.baseValue;
+                                    if (v.eSkillEffectVariableFormat === 'Percentage') val = Math.round(val * 100) + '%';
+                                    else if (v.eSkillEffectVariableFormat === 'Rounded') val = Math.round(val);
+                                    else if (v.eSkillEffectVariableFormat === 'Multiplicative') val = Math.round((val-1)*100) + '%[x]';
+                                    return `<strong>${val}</strong>`;
+                                }
+                            }
+                            if (i === 1) return `<strong>${finalValStr}</strong>`;
+                            return match; 
+                        }
+                    });
+
+                    descText = descText.replace(/\n/g, '<br>');
+                    descDiv.innerHTML = descText;
+                }
+            };
+
+            if ((isStrictlyUnique || isRare) && def.description) {
+                let hasDesc = false;
+                if (Array.isArray(def.description)) hasDesc = !!(def.description.find(d => d.langCode === 'en') || def.description[0]);
+                else if (typeof def.description === 'string') hasDesc = !!def.description;
+
+                if (hasDesc) {
+                    descDiv = document.createElement('div');
+                    descDiv.style.cssText = 'font-size: 0.85em; color: var(--text-muted); margin-bottom: 8px; font-style: italic; line-height: 1.4; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);';
+                    div.appendChild(descDiv);
+                    updateDescription();
+                }
+            }
+
             let typeLabelContainer = null;
             
             if (isImplicit) {
@@ -393,9 +499,6 @@ export class RelicInspector {
             const nameBtn = document.createElement('button');
             nameBtn.className = 'affix-name-btn';
             nameBtn.textContent = def ? formatString(def.name) : `ID: ${defId}`;
-            
-            const isStrictlyUnique = def && def.eAffixRarity === 'Unique';
-            const isRare = def && def.eAffixRarity === 'Special';
 
             if (isStrictlyUnique) {
                 nameBtn.disabled = true;
@@ -505,6 +608,7 @@ export class RelicInspector {
                 if (source === 'slider') numInput.value = v.toFixed(3);
                 else { slider.value = v; this.editor.renderer.updateSliderFill(slider); }
                 if (range) calcVal.textContent = dataManager.calculateRealValue(v, range, level, def);
+                if (descDiv) updateDescription();
             };
 
             slider.oninput = (e) => { updateVal(e.target.value, 'slider'); this.editor.renderer.updateSliderFill(e.target); };

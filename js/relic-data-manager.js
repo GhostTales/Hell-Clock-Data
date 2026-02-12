@@ -29,9 +29,7 @@ export class RelicDataManager {
             }
         };
 
-        this.stashItems = []; 
-        this.stashWidth = 6;  
-        this.stashHeight = 50; 
+        this.reliquaryItems = [];
         this.stashCellSize = 60;
         
         this.rarityConfigMap = {};
@@ -203,6 +201,21 @@ export class RelicDataManager {
                 if (!this.data.save || !this.data.save._relicLoadoutsSaveData) {
                     throw new Error("Invalid save file structure.");
                 }
+                
+                this.reliquaryItems = [];
+                if (this.data.save.externalInventorySaveData && Array.isArray(this.data.save.externalInventorySaveData.ItemPages)) {
+                    this.data.save.externalInventorySaveData.ItemPages.forEach((page, pIndex) => {
+                        if (page.Items && Array.isArray(page.Items)) {
+                            page.Items.forEach(item => {
+                                item._pageIndex = pIndex;
+                                this.reliquaryItems.push(item);
+                            });
+                        }
+                    });
+                } else {
+                    this.reliquaryItems = [];
+                }
+
                 this.editor.initEditorUI();
             } catch (err) {
                 alert(`Error parsing save file: ${err.message}`);
@@ -214,6 +227,32 @@ export class RelicDataManager {
 
     downloadSave() {
         if (!this.data.save) return;
+
+        // Sync Reliquary items back to save structure
+        if (this.data.save.externalInventorySaveData) {
+            const pagesList = [];
+            // Use BoughtPages as minimum count, or at least 1
+            let pageCount = this.data.save.externalInventorySaveData.BoughtPages || 1;
+            
+            // Expand if we have items on further pages
+            this.reliquaryItems.forEach(item => {
+                const p = item._pageIndex || 0;
+                if (p + 1 > pageCount) pageCount = p + 1;
+            });
+
+            for (let i = 0; i < pageCount; i++) {
+                pagesList.push({ Items: [] });
+            }
+
+            this.reliquaryItems.forEach(item => {
+                const p = item._pageIndex || 0;
+                if (pagesList[p]) pagesList[p].Items.push(item);
+            });
+
+            this.data.save.externalInventorySaveData.ItemPages = pagesList;
+            this.data.save.externalInventorySaveData.BoughtPages = pageCount;
+        }
+
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data.save, null, 4));
         const a = document.createElement('a');
         a.href = dataStr;
@@ -396,6 +435,8 @@ export class RelicDataManager {
         } else if (def.statModifierType) {
             format = def.statModifierType; 
         }
+
+        if (def.id === 0 || def.id === 1) format = "Percentage";
 
         switch (format) {
             case "Percentage":
