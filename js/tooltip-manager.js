@@ -1,5 +1,5 @@
 // c:\MasterFolder\Programming\Hell-Clock-Data\js\tooltip-manager.js
-import { formatString } from './utils.js';
+import { formatString, formatAffixDescription } from './utils.js';
 
 export class TooltipManager {
     constructor(editor) {
@@ -155,92 +155,10 @@ export class TooltipManager {
             : `<img src="${iconPath}" class="${imgClass}" onerror="this.style.display='none'">`;
 
         let contentHtml = '';
-        let descText = null;
-
-        if (def.description) {
-            if (Array.isArray(def.description)) {
-                const enObj = def.description.find(d => d.langCode === 'en') || def.description[0];
-                if (enObj) descText = enObj.langTranslation;
-            } else if (typeof def.description === 'string') {
-                descText = def.description;
-            }
-        }
+        const affixName = this.editor.dataManager.getAffixName(defId);
+        let descText = formatAffixDescription(def, this.editor.dataManager, finalValStr, affixName);
 
         if (descText) {
-            descText = descText.replace(/<style="[^"]+">/g, '').replace(/<\/style>/g, '');
-            descText = descText.replace(/<color=(#[a-fA-F0-9]+)>(.*?)<\/color>/g, '<span style="color:$1">$2</span>');
-
-            const affixName = this.editor.dataManager.getAffixName(defId);
-
-            descText = descText.replace(/{(\d+)}/g, (match, indexStr) => {
-                const i = parseInt(indexStr);
-                
-                if (def.type === 'StatModifierAffixDefinition' || def.type === 'SkillLevelAffixDefinition') {
-                    if (i === 0) return affixName;
-                    if (i === 1) return `<strong>${finalValStr}</strong>`;
-                    if (i === 2) {
-                        if (def.type === 'SkillLevelAffixDefinition') {
-                            return `<strong>${this.editor.dataManager.getMaxSkillUpgradeLevelBonus()}</strong>`;
-                        } else if (def.additionalStatModifierDefinitions && def.additionalStatModifierDefinitions.length > 0) {
-                            return ` / ${this.editor.dataManager.formatStatName(def.additionalStatModifierDefinitions[0].eStatDefinition)}`;
-                        }
-                    }
-                    return ""; 
-                } else if (def.type === 'RegenOnKillAffixDefinition' || def.type === 'StatusMaxStacksAffixDefinition') {
-                    if (i === 0) return `<strong>${finalValStr}</strong>`;
-                    if (i === 1) return affixName;
-                    return "";
-                } else {
-                    // {0} is always the main value (Roll)
-                    if (i === 0) return `<strong>${finalValStr}</strong>`;
-                    
-                    // Handle {1}, {2}, etc. via additionalLocalizationVariables mapping
-                    if (def.additionalLocalizationVariables && def.additionalLocalizationVariables[i - 1]) {
-                        const locVar = def.additionalLocalizationVariables[i - 1];
-                        const targetName = locVar.skillEffectVariableReference?.name;
-                        
-                        let varsList = [];
-                        if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
-                        else if (def.variables?.variables) varsList = def.variables.variables;
-
-                        const targetVar = varsList.find(v => v.name === targetName);
-                        if (targetVar && targetVar.baseValue !== undefined) {
-                            let val = targetVar.baseValue;
-                            const format = locVar.valueFormatOverride || targetVar.eSkillEffectVariableFormat;
-                            
-                            if (format === 'Percentage') val = Math.round(val * 100) + '%';
-                            else if (format === 'Rounded') val = Math.round(val);
-                            else if (format === 'Multiplicative') val = Math.round((val - 1) * 100) + '%[x]';
-                            
-                            return `<strong>${val}</strong>`;
-                        }
-                    }
-
-                    // Fallback: Try to find variable by index if not found in additional map
-                    let varsList = [];
-                    if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
-                    else if (def.variables?.variables) varsList = def.variables.variables;
-
-                    let v = varsList[i];
-                    if (!v && i > 0) v = varsList[i-1];
-
-                    if (v) {
-                        if (v.name === "Roll") return `<strong>${finalValStr}</strong>`;
-                        if (typeof v === 'object' && v.baseValue !== undefined) {
-                            let val = v.baseValue;
-                            if (v.eSkillEffectVariableFormat === 'Percentage') val = Math.round(val * 100) + '%';
-                            else if (v.eSkillEffectVariableFormat === 'Rounded') val = Math.round(val);
-                            else if (v.eSkillEffectVariableFormat === 'Multiplicative') val = Math.round((val-1)*100) + '%[x]';
-                            return `<strong>${val}</strong>`;
-                        }
-                    }
-                    if (i === 1) return `<strong>${finalValStr}</strong>`;
-                    return match; 
-                }
-            });
-
-            descText = descText.replace(/\n/g, '<br>');
-
             contentHtml = `
                 <div class="tooltip-text column-mode">
                     <span class="tooltip-desc">${descText}</span>

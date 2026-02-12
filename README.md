@@ -12,7 +12,7 @@ You can access the web tools directly in your browser here:
   - View and modify relic stats, upgrade levels, tiers, and rarity.
   - **Affix Editor**: Add, remove, or modify Primary, Secondary, and Implicit affixes with roll ranges.
   - **Relic Creation**: Generate specific unique or base relics directly into your inventory.
-- **Inventory Management**: Visual grid and stash interface for organizing items.
+- **Inventory Management**: Visual grid and reliquary interface for organizing items.
 
 ## Running Locally
 If you prefer to run the editor locally:

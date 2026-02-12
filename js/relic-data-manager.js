@@ -1,4 +1,4 @@
-import { secureReviver, formatString } from './utils.js';
+import { secureReviver, formatString, getEnglishTranslation } from './utils.js';
 
 export class RelicDataManager {
     constructor(editor) {
@@ -285,10 +285,8 @@ export class RelicDataManager {
             const skillId = def.skillDefinition.id;
             const skillDef = this.definitions.skills[skillId];
             if (skillDef) {
-                if (skillDef.localizedName && Array.isArray(skillDef.localizedName)) {
-                    const en = skillDef.localizedName.find(k => k.langCode === 'en');
-                    if (en) return en.langTranslation;
-                }
+                const en = getEnglishTranslation(skillDef.localizedName);
+                if (en) return en;
                 if (skillDef.name) return formatString(skillDef.name);
             }
         }
@@ -296,20 +294,17 @@ export class RelicDataManager {
         // Prioritize Stat Name for common stat modifiers to avoid flavor names (e.g. "Faith" vs "Mana Regen")
         if (def.type === 'StatModifierAffixDefinition' && def.eStatDefinition) {
             // Exception for "All Resistances" which is a composite stat named correctly in localization
-            if (def.nameLocalizationKey && def.nameLocalizationKey.some(k => k.langTranslation === 'All Resistances')) {
-                 const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
-                 if (en) return en.langTranslation;
-            }
+            const en = getEnglishTranslation(def.nameLocalizationKey);
+            if (en === 'All Resistances') return en;
+            
             return this.formatStatName(def.eStatDefinition);
         }
         if (def.type === 'RegenOnKillAffixDefinition' && def.eStatRegen) {
              return this.formatStatName(def.eStatRegen);
         }
         
-        if (def.nameLocalizationKey && Array.isArray(def.nameLocalizationKey)) {
-            const en = def.nameLocalizationKey.find(k => k.langCode === 'en');
-            if (en) return en.langTranslation;
-        }
+        const enName = getEnglishTranslation(def.nameLocalizationKey);
+        if (enName) return enName;
 
         if (def.name && !def.name.startsWith("Stat -")) return formatString(def.name);
         
