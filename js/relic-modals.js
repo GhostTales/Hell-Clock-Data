@@ -85,18 +85,20 @@ export class RelicModals {
             const name = opt.name.toLowerCase();
             const id = String(opt.id);
 
-            if (hideSpoilers && dataManager.nonDroppableAffixIds && dataManager.nonDroppableAffixIds.has(def.id)) {
-                return false;
+            if (hideSpoilers) {
+                if (dataManager.nonDroppableAffixIds && dataManager.nonDroppableAffixIds.has(def.id)) {
+                    return false;
+                }
+
+                const poolInfo = dataManager.affixPoolMap ? dataManager.affixPoolMap[def.id] : null;
+                const isUnique = def.eAffixRarity === 'Unique';
+                const isSpecial = def.eAffixRarity === 'Special';
+                const cats = dataManager.getAffixCategory(def.id);
+
+                if (!poolInfo && !isUnique && !isSpecial && cats.length === 0) return false;
             }
 
             if (def.eAffixRarity === 'Unique') return false;
-
-            // Check size restrictions
-            if (this.editor.selectedRelicIndex !== -1 && def.blockCraftOnRelicSizes && def.blockCraftOnRelicSizes.length > 0) {
-                const item = this.editor.getSelectedItem();
-                const relicDef = dataManager.definitions.relics[item._relicBaseDefinitionID];
-                if (relicDef && def.blockCraftOnRelicSizes.includes(relicDef.eRelicSize)) return false;
-            }
 
             if (this.editor.restrictSearch && this.activeAffixType) {
                 if (this.activeAffixType === 'implicit') {
