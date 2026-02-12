@@ -250,7 +250,7 @@ input[type="file"] {
 
 .relic-item {
     position: absolute;
-    background-color: rgba(22, 27, 34, 0.95);
+    background-color: rgba(22, 27, 34, 1);
     border: 2px solid var(--text-muted);
     box-sizing: border-box;
     cursor: pointer;
@@ -266,19 +266,46 @@ input[type="file"] {
     word-break: break-word;
     border-radius: 4px;
     color: var(--text-color);
+    backface-visibility: hidden;
+    will-change: transform;
 }
 
 .relic-item:hover {
     border-color: var(--text-color);
     z-index: 20;
-    transform: translateY(-2px);
+    transform: translateY(-5px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 
 .relic-item.selected {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.4);
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 1);
     z-index: 30;
+}
+
+.relic-level-indicator {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: var(--dot-gap, 2px);
+    pointer-events: none;
+    z-index: 15;
+    align-items: center;
+}
+
+.level-dot {
+    width: var(--dot-size, 4px);
+    height: var(--dot-size, 4px);
+    min-width: var(--dot-size, 4px);
+    min-height: var(--dot-size, 4px);
+    border-radius: 50%;
+    background-color: #2ae943;
+    box-shadow: 0 0 2px rgba(0,0,0,0.8);
+    flex-shrink: 0;
+    aspect-ratio: 1;
 }
 
 /* Rarity Colors */

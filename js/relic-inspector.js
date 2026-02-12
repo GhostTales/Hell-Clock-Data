@@ -88,6 +88,7 @@ export class RelicInspector {
         statsGrid.appendChild(createGridInput('Level', item._upgradeLevel, 0, 10, (v) => {
             item._upgradeLevel = v;
             this.renderInspector();
+            this.editor.renderer.renderGrid();
         }));
 
         const currentTier = item._tier || 1; 

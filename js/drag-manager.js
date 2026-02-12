@@ -342,12 +342,12 @@ export class DragManager {
         const el = document.createElement('div');
         el.className = `relic-item rarity-${clone._eRelicRarity} tier-${clone._tier || 1} dragging`;
         
-        this.editor.renderer.renderRelicContent(el, def, clone._tier);
-        
         const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         const gap = 4;
         el.style.width = `${size.w * currentCellSize + (size.w - 1) * gap}px`;
         el.style.height = `${size.h * currentCellSize + (size.h - 1) * gap}px`;
+
+        this.editor.renderer.renderRelicContent(el, def, clone._tier, clone._eRelicRarity, clone._upgradeLevel);
         
         el.style.position = 'fixed';
         el.style.zIndex = 9999;

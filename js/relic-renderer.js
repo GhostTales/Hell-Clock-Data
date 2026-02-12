@@ -41,7 +41,7 @@ export class RelicRenderer {
         loadout.Items.forEach((item, index) => {
             const def = dataManager.definitions.relics[item._relicBaseDefinitionID];
             const size = dataManager.getRelicSize(def);
-            const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
+            const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}-${item._upgradeLevel || 0}`;
 
             let el = this.relicDomMap.get(item);
 
@@ -80,7 +80,7 @@ export class RelicRenderer {
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 
             if (el.dataset.signature !== contentSignature) {
-                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
+                this.renderRelicContent(el, def, item._tier, item._eRelicRarity, item._upgradeLevel || 0);
                 el.dataset.signature = contentSignature;
             }
         });
@@ -138,7 +138,7 @@ export class RelicRenderer {
 
             const def = dataManager.definitions.relics[item._relicBaseDefinitionID];
             const size = dataManager.getRelicSize(def);
-            const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}`;
+            const contentSignature = `${def.id}-${item._tier}-${item._eRelicRarity}-${item._upgradeLevel || 0}`;
 
             let el = this.relicDomMap.get(item);
 
@@ -172,7 +172,7 @@ export class RelicRenderer {
             el.style.height = `${size.h * cellSize + (size.h - 1) * gap}px`;
 
             if (el.dataset.signature !== contentSignature) {
-                this.renderRelicContent(el, def, item._tier, item._eRelicRarity);
+                this.renderRelicContent(el, def, item._tier, item._eRelicRarity, item._upgradeLevel || 0);
                 el.dataset.signature = contentSignature;
             }
         });
@@ -181,7 +181,7 @@ export class RelicRenderer {
         staleRelics.forEach(el => el.remove());
     }
 
-    renderRelicContent(container, def, tier) {
+    renderRelicContent(container, def, tier, rarity, level) {
         const dataManager = this.editor.dataManager;
         container.innerHTML = ''; 
         if (!def) return;
@@ -194,9 +194,32 @@ export class RelicRenderer {
             container.appendChild(imgElement);
         };
 
+        const addLevelDots = () => {
+            if (level && level > 0) {
+                const levelContainer = document.createElement('div');
+                levelContainer.className = 'relic-level-indicator';
+
+                const rootStyle = getComputedStyle(document.documentElement);
+                const gridSize = parseFloat(rootStyle.getPropertyValue('--grid-cell-size')) || 60;
+                const dotSize = Math.floor(gridSize / 15);
+                const dotGap = Math.floor(gridSize / 30);
+
+                levelContainer.style.setProperty('--dot-size', `${dotSize}px`);
+                levelContainer.style.setProperty('--dot-gap', `${dotGap}px`);
+
+                for (let i = 0; i < level; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'level-dot';
+                    levelContainer.appendChild(dot);
+                }
+                container.appendChild(levelContainer);
+            }
+        };
+
         if (this.resolvedImageCache.has(cacheKey)) {
             const img = document.createElement('img');
             configureImage(img, this.resolvedImageCache.get(cacheKey));
+            addLevelDots();
             return;
         }
 
@@ -241,6 +264,8 @@ export class RelicRenderer {
         } else {
             this.renderRelicTextFallback(container, def, tier);
         }
+
+        addLevelDots();
     }
 
     renderRelicTextFallback(container, def, tier) {

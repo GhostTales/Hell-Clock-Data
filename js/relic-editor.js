@@ -284,12 +284,13 @@ class RelicEditor {
         const size = this.dataManager.getRelicSize(def);
         const el = document.createElement('div');
         el.className = `relic-item rarity-${newRelic._eRelicRarity} tier-${newRelic._tier || 1} dragging`;
-        this.renderer.renderRelicContent(el, def, newRelic._tier);
         
         const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
         const gap = 4;
         el.style.width = `${size.w * currentCellSize + (size.w - 1) * gap}px`;
         el.style.height = `${size.h * currentCellSize + (size.h - 1) * gap}px`;
+
+        this.renderer.renderRelicContent(el, def, newRelic._tier, newRelic._eRelicRarity, newRelic._upgradeLevel);
         
         el.style.position = 'fixed';
         el.style.zIndex = 9999;
