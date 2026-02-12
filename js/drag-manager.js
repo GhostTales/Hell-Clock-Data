@@ -340,7 +340,7 @@ export class DragManager {
         const size = this.editor.dataManager.getRelicSize(def);
         
         const el = document.createElement('div');
-        el.className = `relic-item rarity-${clone._eRelicRarity} dragging`;
+        el.className = `relic-item rarity-${clone._eRelicRarity} tier-${clone._tier || 1} dragging`;
         
         this.editor.renderer.renderRelicContent(el, def, clone._tier);
         

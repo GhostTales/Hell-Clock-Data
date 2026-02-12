@@ -71,7 +71,7 @@ export class RelicRenderer {
             el.dataset.index = index; 
 
             const isSelected = (this.editor.selectedContainer === 'main' && index === this.editor.selectedRelicIndex);
-            el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
+            el.className = `relic-item rarity-${item._eRelicRarity} tier-${item._tier || 1} ${isSelected ? 'selected' : ''}`;
 
             const visualY = height - item._position.y - size.h;
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 
@@ -163,7 +163,7 @@ export class RelicRenderer {
             el.dataset.index = index;
 
             const isSelected = (this.editor.selectedContainer === 'reliquary' && index === this.editor.selectedRelicIndex);
-            el.className = `relic-item rarity-${item._eRelicRarity} ${isSelected ? 'selected' : ''}`;
+            el.className = `relic-item rarity-${item._eRelicRarity} tier-${item._tier || 1} ${isSelected ? 'selected' : ''}`;
 
             const visualY = rows - item._position.y - size.h;
             el.style.left = `${item._position.x * (cellSize + gap) + 10}px`; 

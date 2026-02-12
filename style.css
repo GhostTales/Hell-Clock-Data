@@ -282,10 +282,11 @@ input[type="file"] {
 }
 
 /* Rarity Colors */
-.rarity-0 { border-color: #8b949e; background: #21262d; } 
-.rarity-1 { border-color: #58a6ff; background: #10182d; } 
-.rarity-2 { border-color: #d29922; background: #251e08; } 
-.rarity-3 { border-color: #f85149; background: #280d0d; } 
+.rarity-0 { border-color: #8b949e; background: #353d47; } 
+.rarity-1 { border-color: #58a6ff; background: #142244; } 
+.rarity-2 { border-color: #d29922; background: #46390f; } 
+.rarity-3 { border-color: #f85149; background: #4d1111; } 
+.rarity-3.tier-4 { border-color: #58a6ff; } 
 
 /* Form Elements */
 .form-group {

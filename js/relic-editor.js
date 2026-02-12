@@ -283,7 +283,7 @@ class RelicEditor {
 
         const size = this.dataManager.getRelicSize(def);
         const el = document.createElement('div');
-        el.className = `relic-item rarity-${newRelic._eRelicRarity} dragging`;
+        el.className = `relic-item rarity-${newRelic._eRelicRarity} tier-${newRelic._tier || 1} dragging`;
         this.renderer.renderRelicContent(el, def, newRelic._tier);
         
         const currentCellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
