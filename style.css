@@ -737,7 +737,7 @@ button:disabled { background-color: #21262d; color: #8b949e; cursor: not-allowed
     box-shadow: 0 10px 20px rgba(0,0,0,0.5);
     z-index: 100 !important;
     cursor: grabbing;
-    transition: none; /* Disable transition for instant follow response */
+    transition: width 0.2s ease, height 0.2s ease; /* Smooth resize, instant position */
     pointer-events: none; /* Important for mouse tracking */
 }
 
