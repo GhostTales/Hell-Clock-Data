@@ -42,7 +42,8 @@ export class RelicDataManager {
         this.statOverrides = {
             'MaxBarrier': 'Max. Conviction',
             'BarrierDecayResilience': 'Conviction Decay Resistance',
-            'SkillManaCost': 'Mana Cost'
+            'SkillManaCost': 'Mana Cost',
+            'ManaRegen': 'Mana Regeneration',
         };
     }
 

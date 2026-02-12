@@ -164,7 +164,6 @@ export class TooltipManager {
         }
 
         if (descText) {
-            descText = descText.replace(/Barrier/g, 'Conviction');
             descText = descText.replace(/<style="[^"]+">/g, '').replace(/<\/style>/g, '');
             descText = descText.replace(/<color=(#[a-fA-F0-9]+)>(.*?)<\/color>/g, '<span style="color:$1">$2</span>');
 
@@ -189,8 +188,32 @@ export class TooltipManager {
                     if (i === 1) return affixName;
                     return "";
                 } else {
+                    // {0} is always the main value (Roll)
                     if (i === 0) return `<strong>${finalValStr}</strong>`;
                     
+                    // Handle {1}, {2}, etc. via additionalLocalizationVariables mapping
+                    if (def.additionalLocalizationVariables && def.additionalLocalizationVariables[i - 1]) {
+                        const locVar = def.additionalLocalizationVariables[i - 1];
+                        const targetName = locVar.skillEffectVariableReference?.name;
+                        
+                        let varsList = [];
+                        if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
+                        else if (def.variables?.variables) varsList = def.variables.variables;
+
+                        const targetVar = varsList.find(v => v.name === targetName);
+                        if (targetVar && targetVar.baseValue !== undefined) {
+                            let val = targetVar.baseValue;
+                            const format = locVar.valueFormatOverride || targetVar.eSkillEffectVariableFormat;
+                            
+                            if (format === 'Percentage') val = Math.round(val * 100) + '%';
+                            else if (format === 'Rounded') val = Math.round(val);
+                            else if (format === 'Multiplicative') val = Math.round((val - 1) * 100) + '%[x]';
+                            
+                            return `<strong>${val}</strong>`;
+                        }
+                    }
+
+                    // Fallback: Try to find variable by index if not found in additional map
                     let varsList = [];
                     if (def.behaviorData?.variables?.variables) varsList = def.behaviorData.variables.variables;
                     else if (def.variables?.variables) varsList = def.variables.variables;
