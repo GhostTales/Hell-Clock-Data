@@ -134,10 +134,14 @@ export class TooltipManager {
             iconName = def.customIcon.endsWith('.png') ? def.customIcon : `${def.customIcon}.png`;
         } else if (isRareOrUnique && def.name && def.name.includes(' - ')) {
              let skillName = def.name.split(' - ')[0].replace(/^The\s+/i, '').replace(/[^a-zA-Z0-9]/g, '');
-             if (skillName === 'VeilofQuills') skillName = 'HomingProjectiles';
-             if (skillName === 'Matadeira') skillName = 'EnemyCannons';
-             if (skillName === 'Bombardment') skillName = 'RainOfHeads';
-             if (skillName === 'SummonMarksmen') skillName = 'PhantomMarksmen';
+             const skillNameMap = {
+                 'VeilofQuills': 'HomingProjectiles',
+                 'Matadeira': 'EnemyCannons',
+                 'Bombardment': 'RainOfHeads',
+                 'SummonMarksmen': 'PhantomMarksmen',
+                 'Splitshot': 'SplitShot'
+             };
+             if (skillNameMap[skillName]) skillName = skillNameMap[skillName];
              iconName = `IconSkill_${skillName}.png`;
         } else if (cats.includes(3)) {
             iconName = 'UI_CorruptedBullet.png';
