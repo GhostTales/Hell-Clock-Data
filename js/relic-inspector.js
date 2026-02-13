@@ -535,37 +535,6 @@ export class RelicInspector {
             controls.appendChild(slider);
             controls.appendChild(numInput);
 
-            if (isImplicit) {
-                const catSelect = document.createElement('select');
-                catSelect.className = 'input-standard';
-                catSelect.style.width = 'auto';
-                catSelect.style.marginLeft = '5px';
-                catSelect.style.fontSize = '0.8em';
-                catSelect.style.padding = '2px';
-                catSelect.title = "Implicit Category";
-
-                const categories = [
-                    { id: 0, name: 'Fury' },
-                    { id: 1, name: 'Faith' },
-                    { id: 2, name: 'Discipline' },
-                    { id: 3, name: 'Corrupted' }
-                ];
-
-                categories.forEach(cat => {
-                    const opt = document.createElement('option');
-                    opt.value = cat.id;
-                    opt.text = cat.name;
-                    if ((itemWrapper._eImplicitAffixCategory || 0) === cat.id) opt.selected = true;
-                    catSelect.appendChild(opt);
-                });
-
-                catSelect.onchange = (e) => {
-                    itemWrapper._eImplicitAffixCategory = parseInt(e.target.value);
-                    this.renderInspector();
-                };
-                controls.appendChild(catSelect);
-            }
-
             if (allowRemove && !isStrictlyUnique) {
                 const btnRemove = document.createElement('button');
                 btnRemove.className = 'btn-remove-danger';
