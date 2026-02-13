@@ -232,9 +232,10 @@ export class RelicDataManager {
         if (this.data.save.externalInventorySaveData) {
             const pagesList = [];
             // Use BoughtPages as minimum count, or at least 1
-            let pageCount = this.data.save.externalInventorySaveData.BoughtPages || 1;
+            let boughtPages = this.data.save.externalInventorySaveData.BoughtPages || 0;
+            let totalPageCount = boughtPages + 3;
             
-            for (let i = 0; i < pageCount; i++) {
+            for (let i = 0; i < totalPageCount; i++) {
                 pagesList.push({ Items: [] });
             }
 
@@ -244,7 +245,7 @@ export class RelicDataManager {
             });
 
             this.data.save.externalInventorySaveData.ItemPages = pagesList;
-            this.data.save.externalInventorySaveData.BoughtPages = pageCount;
+            this.data.save.externalInventorySaveData.BoughtPages = boughtPages;
         }
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data.save, null, 4));
