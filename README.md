@@ -1,6 +1,6 @@
 # Hell Clock Data & Save Editor
 
-**most code in here is made with gemini, and was only checked to make sure it actually worked corectly by me.**
+**most code in here was made with gemini, and was only checked to make sure it actually worked corectly by me.**
 
 This repository hosts a web-based save editor and data viewer for **Hell Clock**.
 
