@@ -240,6 +240,7 @@ input[type="file"] {
     background-color: var(--slot-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
+    box-sizing: border-box;
 }
 
 .grid-slot.blocked {
