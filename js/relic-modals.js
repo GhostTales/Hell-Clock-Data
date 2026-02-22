@@ -56,10 +56,13 @@ export class RelicModals {
         let allowedIds = []; 
         let itemHasType = false;      
         let itemHasCorrupted = false; 
+        let currentRelicSize = null;
 
         if (this.editor.restrictSearch && this.activeAffixType && this.editor.selectedRelicIndex !== -1) {
              const item = this.editor.getSelectedItem();
              if (item) {
+                 const rDef = dataManager.definitions.relics[item._relicBaseDefinitionID];
+                 if (rDef) currentRelicSize = rDef.eRelicSize;
                  if (this.activeAffixType === 'implicit') {
                      const currentImplicits = item._implicitAffixesData || [];
                      currentImplicits.forEach(imp => {
@@ -102,6 +105,11 @@ export class RelicModals {
 
             if (this.editor.restrictSearch && this.activeAffixType) {
                 if (this.activeAffixType === 'implicit') {
+                    if (currentRelicSize) {
+                        const sizes = dataManager.getAffixSizes(def.id);
+                        if (sizes.length > 0 && !sizes.includes(currentRelicSize)) return false;
+                    }
+
                     const candCats = dataManager.getAffixCategory(def.id);
                     if (candCats.length === 0) return false;
                     const candHasType = candCats.some(c => c >= 0 && c <= 2);

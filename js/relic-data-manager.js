@@ -34,6 +34,7 @@ export class RelicDataManager {
         
         this.rarityConfigMap = {};
         this.affixCategoryMap = {};
+        this.affixSizeMap = {};
         this.affixPoolMap = {};
         this.nonDroppableAffixIds = new Set();
 
@@ -130,6 +131,7 @@ export class RelicDataManager {
         }
 
         this.affixCategoryMap = {};
+        this.affixSizeMap = {};
         if (this.data.config && this.data.config.relicSizeConfigs) {
             const catNameToId = {
                 "FuryImbued": 0,
@@ -158,6 +160,13 @@ export class RelicDataManager {
                                     }
                                     if (!this.affixCategoryMap[affixId].includes(catId)) {
                                         this.affixCategoryMap[affixId].push(catId);
+                                    }
+
+                                    if (!this.affixSizeMap[affixId]) {
+                                        this.affixSizeMap[affixId] = [];
+                                    }
+                                    if (!this.affixSizeMap[affixId].includes(sizeKey)) {
+                                        this.affixSizeMap[affixId].push(sizeKey);
                                     }
                                 }
                             });
@@ -369,6 +378,10 @@ export class RelicDataManager {
     getRelicSize(relicDef) {
         if (!relicDef) return this.definitions.sizes.Default;
         return this.definitions.sizes[relicDef.eRelicSize] || this.definitions.sizes.Default;
+    }
+
+    getAffixSizes(defId) {
+        return this.affixSizeMap[defId] || [];
     }
 
     getAffixCategory(defId) {
