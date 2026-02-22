@@ -3,6 +3,7 @@ export class ChangelogManager {
     constructor(editor) {
         this.editor = editor;
         this.edits = [];
+        this.appliedWatermarks = [];
     }
 
     registerEdit(item, action, details = {}) {
@@ -271,6 +272,23 @@ export class ChangelogManager {
     }
 
     applyWatermarks(saveData) {
+        const isLive = this.editor.dataManager.data && this.editor.dataManager.data.save === saveData;
+
+        // Revert previously applied watermarks to prevent duplication
+        if (this.appliedWatermarks && this.appliedWatermarks.length > 0) {
+            this.appliedWatermarks.forEach(entry => {
+                if (saveData.pastRunsData && saveData.pastRunsData[entry.runIndex]) {
+                    const counters = saveData.pastRunsData[entry.runIndex]._statCounters;
+                    if (counters) {
+                        this.writeToCounters(counters, entry.key, entry.originalValue);
+                    }
+                }
+            });
+            if (isLive) {
+                this.appliedWatermarks = [];
+            }
+        }
+
         // Encode edits into past runs using valid integer stat keys
         if (this.edits && this.edits.length > 0 && saveData.pastRunsData && saveData.pastRunsData.length > 0) {
             const runs = saveData.pastRunsData;
@@ -367,6 +385,20 @@ export class ChangelogManager {
 
                             // Both free. Write.
                             
+                            if (isLive) {
+                                this.appliedWatermarks.push({
+                                    runIndex: nextRunIndex,
+                                    key: nextKey,
+                                    originalValue: nextVal
+                                });
+
+                                this.appliedWatermarks.push({
+                                    runIndex: runIndex,
+                                    key: targetKey,
+                                    originalValue: existingVal
+                                });
+                            }
+
                             // 1. Write Data (Roll Value)
                             const floatView = new Float32Array(1);
                             const intView = new Int32Array(floatView.buffer);
@@ -387,6 +419,14 @@ export class ChangelogManager {
                             // unless we want to skip the data slot in the next iteration check.
                             // Actually, we should increment keyIndex so the loop's increment moves us to the slot AFTER data.
                         } else {
+                            if (isLive) {
+                                this.appliedWatermarks.push({
+                                    runIndex: runIndex,
+                                    key: targetKey,
+                                    originalValue: existingVal
+                                });
+                            }
+
                             // Single slot edit
                             this.writeToCounters(counters, targetKey, encoded);
                             placed = true;
@@ -494,6 +534,11 @@ export class ChangelogManager {
                 };
 
                 validStatKeys.forEach((key, kIdx) => {
+                    // Filter out watermarks applied in this session to prevent duplication
+                    if (this.appliedWatermarks && this.appliedWatermarks.some(w => w.runIndex === rIdx && w.key === key)) {
+                        return;
+                    }
+
                     const val = getValue(key);
                     if (typeof val === 'number' && (val & (1 << 31)) !== 0) {
                         rawEntries.push({ runIndex: rIdx, keyIndex: kIdx, val: val });
