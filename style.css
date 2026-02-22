@@ -1116,3 +1116,100 @@ input[type="checkbox"]:focus {
 .tooltip-text.column-mode .tooltip-range {
     align-self: flex-end;
 }
+
+/* --- Changelog Visuals --- */
+.changelog-entry {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    gap: 12px;
+    transition: background-color 0.2s;
+}
+
+.changelog-entry:hover {
+    background-color: var(--panel-bg);
+}
+
+.changelog-badge {
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    min-width: 60px;
+    text-align: center;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.action-add { background-color: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.4); }
+.action-remove { background-color: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.4); }
+.action-modify { background-color: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.4); }
+.action-default { background-color: rgba(139, 148, 158, 0.15); color: #8b949e; border: 1px solid rgba(139, 148, 158, 0.4); }
+
+.changelog-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--slot-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.changelog-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.changelog-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.changelog-name {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.changelog-sub {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.changelog-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 0.75em;
+    color: var(--text-muted);
+    font-family: monospace;
+    flex-shrink: 0;
+}
+
+.changelog-loc {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.changelog-group-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.1s;
+}
+
+.changelog-group-header:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}

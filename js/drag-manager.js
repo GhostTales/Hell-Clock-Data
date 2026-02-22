@@ -1,4 +1,3 @@
-// c:\MasterFolder\Programming\Hell-Clock-Data\js\drag-manager.js
 export class DragManager {
     constructor(editor) {
         this.editor = editor;
@@ -10,6 +9,7 @@ export class DragManager {
         this.boundMouseUp = (ev) => this.handleDragEnd(ev);
     }
 
+    // ... (initDrag, handleDragMove, handleDragEnd remain unchanged) ...
     initDrag(e, item, index, element, source) {
         if (this.isDragging) return;
         if (source !== 'copy_mode' && e.button !== 0) return;
@@ -72,7 +72,6 @@ export class DragManager {
             const startSize = this.editor.dataManager.stashCellSize;
             const endSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--grid-cell-size'));
             
-            // Simple logic: if over main grid, use main size, else use stash size (reliquary)
             const isOverMain = (mx >= mainRect.left && mx <= mainRect.right && my >= mainRect.top && my <= mainRect.bottom);
             const currentCellSize = isOverMain ? endSize : startSize;
 
@@ -164,6 +163,8 @@ export class DragManager {
             } else if (this.dragSource === 'reliquary') {
                 this.editor.dataManager.reliquaryItems.splice(this.dragIndex, 1);
             }
+            
+            this.editor.changelogManager.registerEdit(this.dragItem, "RelicRemoved", { id: this.dragItem._relicBaseDefinitionID });
             
             this.editor.selectedRelicIndex = -1;
             this.editor.renderer.renderGrid();
@@ -266,12 +267,18 @@ export class DragManager {
         
         if (targetType === 'reliquary') {
             this.dragItem._pageIndex = this.editor.reliquaryPage;
+        } else {
+            delete this.dragItem._pageIndex;
         }
 
         if (targetType === 'main') {
             loadout.Items.push(this.dragItem);
         } else {
             this.editor.dataManager.reliquaryItems.push(this.dragItem);
+        }
+        
+        if (this.dragSource === 'copy_mode') {
+            this.editor.changelogManager.registerEdit(this.dragItem, "RelicAdded", { id: this.dragItem._relicBaseDefinitionID });
         }
 
         this.editor.selectedContainer = targetType;

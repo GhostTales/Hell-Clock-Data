@@ -86,17 +86,27 @@ export class RelicInspector {
         };
 
         statsGrid.appendChild(createGridInput('Level', item._upgradeLevel, 0, 10, (v) => {
+            const oldVal = item._upgradeLevel || 0;
             item._upgradeLevel = v;
+            this.editor.changelogManager.registerEdit(item, "StatChanged", { 
+                id: def.id,
+                changes: { level: { old: oldVal, new: v } }
+            });
             this.renderInspector();
             this.editor.renderer.renderGrid();
         }));
 
         const currentTier = item._tier || 1; 
         statsGrid.appendChild(createGridInput('Tier', currentTier, 1, 4, (v) => {
+            const oldVal = item._tier || 1;
             item._tier = v;
             if (item._affixesData) item._affixesData.forEach(a => a._tier = v);
             if (item._implicitAffixesData) item._implicitAffixesData.forEach(i => {
                 if (i._relicAffixData) i._relicAffixData._tier = v;
+            });
+            this.editor.changelogManager.registerEdit(item, "StatChanged", { 
+                id: def.id,
+                changes: { tier: { old: oldVal, new: v } }
             });
             this.renderInspector();
             this.editor.renderer.renderGrid();
@@ -116,7 +126,12 @@ export class RelicInspector {
         }
 
         statsGrid.appendChild(createSelect('Rarity', item._eRelicRarity, rarityOpts, (v) => {
+            const oldVal = item._eRelicRarity || 0;
             item._eRelicRarity = v;
+            this.editor.changelogManager.registerEdit(item, "StatChanged", { 
+                id: def.id,
+                changes: { rarity: { old: oldVal, new: v } }
+            });
             this.editor.renderer.renderGrid(); 
         }));
 
@@ -258,6 +273,7 @@ export class RelicInspector {
         const { title, type, tier, level, isUnlocked, buttons, allowLock, allowRemove } = config;
         const isImplicit = type === 'implicit';
         const dataManager = this.editor.dataManager;
+        const item = this.editor.getSelectedItem();
 
         const headerRow = document.createElement('div');
         headerRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-top:20px; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:6px;';
@@ -430,6 +446,7 @@ export class RelicInspector {
                     this.editor.modals.activeAffixType = contextType; 
                     this.editor.modals.openAffixModal(defId, (newId) => {
                         const parsedId = parseInt(newId);
+                        const oldId = affixData._relicAffixDefinitionId;
                         affixData._relicAffixDefinitionId = parsedId;
                         if (isImplicit) {
                             const cats = dataManager.getAffixCategory(parsedId);
@@ -441,6 +458,8 @@ export class RelicInspector {
                                 itemWrapper._eImplicitAffixCategory = 0;
                             }
                         }
+                        this.editor.changelogManager.registerEdit(item, "AffixRemoved", { id: oldId });
+                        this.editor.changelogManager.registerEdit(item, "AffixAdded", { id: parsedId });
                         this.renderInspector();
                     });
                 };
@@ -505,6 +524,8 @@ export class RelicInspector {
 
             const maxVal = Math.max(1.0, affixData._rollValue, isUnlocked ? 1.2 : 1.0);
             
+            let startRollValue = affixData._rollValue;
+            
             const slider = document.createElement('input');
             slider.type = 'range';
             slider.min = 0;
@@ -522,15 +543,32 @@ export class RelicInspector {
             const updateVal = (val, source) => {
                 let v = parseFloat(val);
                 if (source === 'input' && v > maxVal) v = maxVal;
+                
+                const oldVal = affixData._rollValue;
                 affixData._rollValue = v;
+                
                 if (source === 'slider') numInput.value = v.toFixed(3);
                 else { slider.value = v; this.editor.renderer.updateSliderFill(slider); }
+                
                 if (range) calcVal.textContent = dataManager.calculateRealValue(v, range, level, def);
                 if (descDiv) updateDescription();
             };
 
+            const registerRollChange = () => {
+                this.editor.changelogManager.registerEdit(item, "RollChanged", { 
+                    id: defId,
+                    changes: { old: startRollValue, new: affixData._rollValue }
+                });
+                startRollValue = affixData._rollValue;
+            };
+
             slider.oninput = (e) => { updateVal(e.target.value, 'slider'); this.editor.renderer.updateSliderFill(e.target); };
-            numInput.onchange = (e) => updateVal(e.target.value, 'input');
+            slider.onchange = (e) => registerRollChange(); // Register on release
+            
+            numInput.onchange = (e) => { 
+                updateVal(e.target.value, 'input');
+                registerRollChange();
+            };
 
             controls.appendChild(slider);
             controls.appendChild(numInput);

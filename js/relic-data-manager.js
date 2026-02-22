@@ -46,6 +46,7 @@ export class RelicDataManager {
         };
     }
 
+    // ... (initAutoLoad and processDefinitions remain unchanged) ...
     async initAutoLoad() {
         const files = [
             { key: 'relics', path: 'json_data/relic_data/Relics.json' },
@@ -225,6 +226,7 @@ export class RelicDataManager {
                     this.reliquaryItems = [];
                 }
 
+                this.edits = []; // Reset edits on load
                 this.editor.initEditorUI();
             } catch (err) {
                 alert(`Error parsing save file: ${err.message}`);
@@ -240,7 +242,6 @@ export class RelicDataManager {
         // Sync Reliquary items back to save structure
         if (this.data.save.externalInventorySaveData) {
             const pagesList = [];
-            // Use BoughtPages as minimum count, or at least 1
             let boughtPages = this.data.save.externalInventorySaveData.BoughtPages || 0;
             let totalPageCount = boughtPages + 3;
             
@@ -257,6 +258,8 @@ export class RelicDataManager {
             this.data.save.externalInventorySaveData.BoughtPages = boughtPages;
         }
 
+        this.editor.changelogManager.applyWatermarks(this.data.save);
+
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data.save, null, 4));
         const a = document.createElement('a');
         a.href = dataStr;
@@ -266,6 +269,7 @@ export class RelicDataManager {
         a.remove();
     }
 
+    // ... (getRelicName, getAffixName, etc. remain unchanged) ...
     getRelicName(def, tier) {
         if (!def) return 'Unknown';
         const currentName = def.name || 'Unknown';
@@ -295,12 +299,9 @@ export class RelicDataManager {
             }
         }
 
-        // Prioritize Stat Name for common stat modifiers to avoid flavor names (e.g. "Faith" vs "Mana Regen")
         if (def.type === 'StatModifierAffixDefinition' && def.eStatDefinition) {
-            // Exception for "All Resistances" which is a composite stat named correctly in localization
             const en = getEnglishTranslation(def.nameLocalizationKey);
             if (en === 'All Resistances') return en;
-            
             return this.formatStatName(def.eStatDefinition);
         }
         if (def.type === 'RegenOnKillAffixDefinition' && def.eStatRegen) {
@@ -320,7 +321,6 @@ export class RelicDataManager {
 
     formatStatName(stat) {
         if (this.statOverrides[stat]) return this.statOverrides[stat];
-        
         let name = stat;
         if (name.startsWith('Additional')) name = name.replace('Additional', '');
         return formatString(name);
@@ -475,7 +475,6 @@ export class RelicDataManager {
         
         let limit = limitRange ? limitRange[1] : 0;
 
-        // Add rarity bonus
         const rarityCfg = this.rarityConfigMap[relicItem._eRelicRarity];
         if (rarityCfg) {
             const size = def.eRelicSize || "Small";

@@ -1,4 +1,5 @@
 import { RelicDataManager } from './relic-data-manager.js';
+import { ChangelogManager } from './changelog-manager.js';
 import { RelicRenderer } from './relic-renderer.js';
 import { RelicInspector } from './relic-inspector.js';
 import { RelicModals } from './relic-modals.js';
@@ -8,6 +9,7 @@ import { DragManager } from './drag-manager.js';
 class RelicEditor {
     constructor() {
         this.dataManager = new RelicDataManager(this);
+        this.changelogManager = new ChangelogManager(this);
         this.renderer = new RelicRenderer(this);
         this.inspector = new RelicInspector(this);
         this.modals = new RelicModals(this);
@@ -34,6 +36,7 @@ class RelicEditor {
         this.dataManager.initAutoLoad();
     }
 
+    // ... (renderGrid, renderReliquary, prev/nextReliquaryPage, renderInspector, loadSaveFile, downloadSave, validateSave, filterAffixes, closeModal, openCreationModal, closeCreationModal, filterCreationList, enableSaveUpload, initEditorUI, switchLoadout, updateGridSettings, toggleLimitUnlock, getSelectedItem, updateAffixLock remain unchanged) ...
     renderGrid() {
         this.renderer.renderGrid();
     }
@@ -74,6 +77,19 @@ class RelicEditor {
 
     downloadSave() {
         this.dataManager.downloadSave();
+    }
+
+    validateSave() {
+        const report = this.changelogManager.scanForEdits();
+        if (report.error) {
+            alert(report.error);
+            return;
+        }
+        this.modals.showChangelog(report);
+    }
+
+    closeChangelogModal() {
+        this.modals.closeChangelogModal();
     }
 
     filterAffixes() {
@@ -124,6 +140,9 @@ class RelicEditor {
         }
 
         document.getElementById('downloadBtn').disabled = false;
+        const valBtn = document.getElementById('btn-validate');
+        if (valBtn) valBtn.disabled = false;
+
         this.renderer.renderGrid();
     }
 
@@ -199,17 +218,23 @@ class RelicEditor {
             if (!item._affixesData) item._affixesData = [];
             item._affixesData.push(newAffix);
         }
+        
+        this.changelogManager.registerEdit(item, "AffixAdded", { id: idToUse });
         this.inspector.renderInspector();
     }
 
     removeAffix(index, isImplicit) {
         const item = this.getSelectedItem();
         if (!item) return;
+        let removedId = 0;
         if (isImplicit && item._implicitAffixesData) {
+            removedId = item._implicitAffixesData[index]._relicAffixData._relicAffixDefinitionId;
             item._implicitAffixesData.splice(index, 1);
         } else if (!isImplicit && item._affixesData) {
+            removedId = item._affixesData[index]._relicAffixDefinitionId;
             item._affixesData.splice(index, 1);
         }
+        this.changelogManager.registerEdit(item, "AffixRemoved", { id: removedId });
         this.inspector.renderInspector();
     }
 
@@ -224,6 +249,7 @@ class RelicEditor {
         };
         if (!item._affixesData) item._affixesData = [];
         item._affixesData.push(newAffix);
+        this.changelogManager.registerEdit(item, "AffixAdded", { id: parseInt(id) });
         this.inspector.renderInspector();
     }
 
