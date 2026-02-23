@@ -591,15 +591,21 @@ export class RelicModals {
                     case 3: actionClass = 'action-remove'; actionLabel = 'AFFIX -'; break;
                     case 4: actionClass = 'action-modify'; actionLabel = 'ROLL'; break;
                     case 5: actionClass = 'action-modify'; actionLabel = 'STAT'; break;
+                    case 6: actionClass = 'action-modify'; actionLabel = 'MOVED'; break;
                 }
 
                 let itemName = '';
                 let subText = '';
 
-                if (edit.action === 0 || edit.action === 1 || edit.action === 5) {
+                if (edit.action === 0 || edit.action === 1 || edit.action === 5 || edit.action === 6) {
                      // For relic actions, we already have the header, maybe just say "Properties Changed" or "Created"
                      if (edit.action === 0) itemName = "Item Created";
                      else if (edit.action === 1) itemName = "Item Removed";
+                     else if (edit.action === 6) {
+                         itemName = "Item Moved";
+                         const dest = edit.newLoc === 1 ? "Reliquary" : "Main Grid";
+                         subText = `To: ${dest} [${edit.newX}, ${edit.newY}]`;
+                     }
                      else {
                          itemName = "Stats Modified";
                          const changes = edit.changes || edit._inferredChanges;

@@ -23,6 +23,16 @@ export class ChangelogManager {
             _loadoutIndex: (item._pageIndex === undefined || item._pageIndex === null) ? this.editor.currentLoadoutIndex : undefined
         };
 
+        // For RelicMoved, we want the snapshot to reflect the OLD state (Source),
+        // while the item passed in is the NEW state (Destination).
+        if (action === "RelicMoved" && details.oldPosition) {
+            itemSnapshot._position = { ...details.oldPosition };
+            if (details.oldPage !== undefined) itemSnapshot._pageIndex = details.oldPage;
+            else delete itemSnapshot._pageIndex;
+            if (details.oldLoadout !== undefined) itemSnapshot._loadoutIndex = details.oldLoadout;
+            else delete itemSnapshot._loadoutIndex;
+        }
+
         // Optimization: Remove redundant previous edits for the same target to save space and keep history clean
             for (let i = this.edits.length - 1; i >= 0; i--) {
                 const prev = this.edits[i];
@@ -74,7 +84,27 @@ export class ChangelogManager {
                         return; // Don't add a new entry
                     }
                 } else if (action === "RelicAdded") {
+                    // If we are adding a relic, we can't merge previous stats into it anymore
+                    // because RelicAdded only holds the ID now.
+                    // However, we don't need to look back for RelicAdded.
+                    // But we should ensure we don't have duplicate adds.
+                    // (The logic below handles pushing the new event)
                     
+                } else if (action === "RelicMoved") {
+                    if (prev.action === "RelicMoved") {
+                        // Merge moves: A->B + B->C = A->C
+                        const prevDestX = prev.details.newX;
+                        const prevDestY = prev.details.newY;
+                        const prevDestLoc = prev.details.newLoc;
+                        const currSrcLoc = (itemSnapshot._pageIndex !== undefined && itemSnapshot._pageIndex !== null) ? 1 : 0;
+                        if (prevDestX === itemSnapshot._position.x && prevDestY === itemSnapshot._position.y && prevDestLoc === currSrcLoc) {
+                             prev.details.newX = details.newX;
+                             prev.details.newY = details.newY;
+                             prev.details.newLoc = details.newLoc;
+                             prev.timestamp = Date.now();
+                             return;
+                        }
+                    }
                 } else if (action === "AffixRemoved") {
                     // If we are removing an affix we just added, cancel both out
                     if (prev.action === "AffixAdded" && prev.details && prev.details.id === details.id) {
@@ -182,6 +212,12 @@ export class ChangelogManager {
                 // Payload (10 bits) will be filled with AffixID in applyWatermarks. rollValue holds the Delta.
                 return { isDouble: true, baseEncoded, rollValue: delta, affixId: edit.details.id };
             case "StatChanged": actionCode = 5; payload = packStatDeltas(edit.details.changes); break;
+            case "RelicMoved": 
+                actionCode = 6;
+                // Payload: 2 unused | 1 Loc | 3 X | 4 Y
+                // Loc: 1=Reliquary, 0=Main
+                payload = (edit.details.newY & 0xF) | ((edit.details.newX & 0x7) << 4) | ((edit.details.newLoc & 1) << 7);
+                break;
             default: actionCode = 7; break;
         }
 
@@ -244,6 +280,7 @@ export class ChangelogManager {
         let level = null;
         let rollDelta = 0;
         let statDeltas = null;
+        let newX = 0, newY = 0, newLoc = 0;
 
         if (action === 0 || action === 1) {
              // Relic Added/Removed
@@ -261,9 +298,14 @@ export class ChangelogManager {
                  rarity: unpackSigned((payload >>> 3) & 0x7, 3),
                  level: unpackSigned((payload >>> 6) & 0xF, 4)
              };
+        } else if (action === 6) {
+             // Relic Moved
+             newY = payload & 0xF;
+             newX = (payload >>> 4) & 0x7;
+             newLoc = (payload >>> 7) & 1;
         }
         
-        return { action, loc, page, x, y, id, rollDelta, tier, rarity, level, statDeltas };
+        return { action, loc, page, x, y, id, rollDelta, tier, rarity, level, statDeltas, newX, newY, newLoc };
     }
 
     applyWatermarks(saveData) {
@@ -600,6 +642,7 @@ export class ChangelogManager {
                 else if (edit.action === "AffixRemoved") actionCode = 3;
                 else if (edit.action === "RollChanged") actionCode = 4;
                 else if (edit.action === "StatChanged") actionCode = 5;
+                else if (edit.action === "RelicMoved") actionCode = 6;
 
                 const decoded = {
                     action: actionCode,
@@ -607,11 +650,15 @@ export class ChangelogManager {
                     page: page,
                     x: item._position.x,
                     y: item._position.y,
-                    id: (actionCode === 0 || actionCode === 1) ? item._relicBaseDefinitionID : (edit.details.id || 0),
+                    id: (actionCode === 0 || actionCode === 1 || actionCode === 6) ? item._relicBaseDefinitionID : (edit.details.id || 0),
                     tier: item._tier,
                     rarity: item._eRelicRarity,
                     level: item._upgradeLevel,
-                    rollDelta: (edit.details.changes) ? (edit.details.changes.new - edit.details.changes.old) : 0,
+                    rollDelta: (edit.details && edit.details.changes) ? (edit.details.changes.new - edit.details.changes.old) : 0,
+                    newX: (edit.details) ? edit.details.newX : 0,
+                    newY: (edit.details) ? edit.details.newY : 0,
+                    newLoc: (edit.details) ? edit.details.newLoc : 0,
+                    newPage: (edit.details) ? edit.details.newPage : undefined,
                     changes: edit.details.changes
                 };
                 allDecodedEdits.push(decoded);
@@ -622,40 +669,155 @@ export class ChangelogManager {
             return { groups: [] };
         }
 
-        // 3. Group by Relic (Location)
+        // 3. Group by Relic using Reverse Tracking (Newest -> Oldest)
+        // This ensures we can link moved items back to their source even if other edits occurred in between.
+        
+        allDecodedEdits.reverse();
+
+        //console.log(`[Changelog] Processing ${allDecodedEdits.length} edits (Newest -> Oldest)`);
+
+        const getKey = (loc, page, x, y) => `${loc}-${page}-${x}-${y}`;
+        const itemMap = new Map();
+
+        // Initialize Item Map from current Save Data (Final State)
+        if (saveData._relicLoadoutsSaveData && saveData._relicLoadoutsSaveData._loadouts) {
+            saveData._relicLoadoutsSaveData._loadouts.forEach((loadout, lIdx) => {
+                if (loadout.Items) {
+                    loadout.Items.forEach(item => {
+                        itemMap.set(getKey(0, lIdx, item._position.x, item._position.y), {
+                            id: item._relicBaseDefinitionID
+                        });
+                    });
+                }
+            });
+        }
+        
+        // Helper to get reliquary items (from memory or save)
+        const reliquaryItems = this.editor.dataManager.reliquaryItems || (saveData._reliquarySaveData ? saveData._reliquarySaveData.Relics : []);
+        reliquaryItems.forEach(item => {
+            itemMap.set(getKey(1, item._pageIndex, item._position.x, item._position.y), {
+                id: item._relicBaseDefinitionID
+            });
+        });
+
+        // Active Groups Map: Tracks the current group for a specific location key
+        const activeGroups = new Map();
         const groups = [];
         let currentGroup = null;
 
         allDecodedEdits.forEach(edit => {
-            // Check if matches current group
-            if (currentGroup && 
-                currentGroup.loc === edit.loc && 
-                currentGroup.page === edit.page &&
-                currentGroup.x === edit.x && 
-                currentGroup.y === edit.y) {
-                
-                currentGroup.edits.push(edit);
-                
-                // Update group info if we find better data (e.g. Relic ID)
-                if (edit.action === 0 || edit.action === 1) {
-                    currentGroup.relicId = edit.id;
+            const key = getKey(edit.loc, edit.page, edit.x, edit.y);
+            
+            // Update Map based on Action (Reverse Logic)
+            let relicInfo = itemMap.get(key);
+
+            if (edit.action === 1) { // RelicRemoved (Reverse: Added/Appeared)
+                // Item appears at this location. If we don't have it, create it.
+                if (!relicInfo) {
+                    relicInfo = { id: edit.id };
+                    itemMap.set(key, relicInfo);
                 }
+            } else if (edit.action === 6) { // RelicMoved (Reverse: Un-Move / Backtrack)
+                // The edit is at Source. It points to Dest.
+                // In reverse, the item is currently at Dest, and we are moving it back to Source.
+                
+                // Try to find the item at Destination
+                // Note: For past runs, we might lack newPage. We fallback to current page if loc matches, else 0.
+                const destPage = (edit.newPage !== undefined) ? edit.newPage : 
+                                 (edit.newLoc === edit.loc ? edit.page : 0);
+                
+                const destKey = getKey(edit.newLoc, destPage, edit.newX, edit.newY);
+                const movedItem = itemMap.get(destKey);
+
+                //console.log(`[Changelog] Processing Move: Dest ${destKey} -> Source ${key}`);
+
+                if (movedItem) {
+                    relicInfo = movedItem;
+                    // Move in map: Dest -> Source
+                    itemMap.delete(destKey);
+                    itemMap.set(key, movedItem);
+                }
+            }
+
+            // Grouping Logic
+            let targetGroup = null;
+
+            // 1. Check if we have an active group at the edit's location
+            if (activeGroups.has(key)) {
+                targetGroup = activeGroups.get(key);
+            } 
+            // 2. If not, check if this is a Move event pointing to an existing group
+            else if (edit.action === 6) {
+                // For a move, the group is currently at 'Dest', but this edit is at 'Source'.
+                // We need to find the group at Dest and move it to Source.
+                const destPage = (edit.newPage !== undefined) ? edit.newPage : 
+                                 (edit.newLoc === edit.loc ? edit.page : 0);
+                const destKey = getKey(edit.newLoc, destPage, edit.newX, edit.newY);
+                
+                if (activeGroups.has(destKey)) {
+                    targetGroup = activeGroups.get(destKey);
+                    
+                    // Move the group in our tracking map
+                    activeGroups.delete(destKey);
+                    activeGroups.set(key, targetGroup);
+                    
+                    // Update group's internal tracking coordinates
+                    targetGroup.trackingLoc = edit.loc;
+                    targetGroup.trackingPage = edit.page;
+                    targetGroup.trackingX = edit.x;
+                    targetGroup.trackingY = edit.y;
+
+                    //console.log(`[Changelog] Linked Move: Group moved from ${destKey} to ${key}`);
+                }
+            }
+
+            if (targetGroup) {
+                targetGroup.edits.push(edit);
+                // Update reference for "current" just in case, though we rely on map now
+                currentGroup = targetGroup;
+                
+                // Update ID if we found a better source
+                if (!currentGroup.relicId && relicInfo) currentGroup.relicId = relicInfo.id;
             } else {
                 // Start new group
+                // Determine the "Final" (Newest) location for this group to display in the header.
+                // If the newest edit is a Move, the item is actually at the Destination.
+                let finalLoc = edit.loc;
+                let finalPage = edit.page;
+                let finalX = edit.x;
+                let finalY = edit.y;
+
+                if (edit.action === 6) {
+                    finalLoc = edit.newLoc;
+                    finalPage = (edit.newPage !== undefined) ? edit.newPage : edit.page;
+                    finalX = edit.newX;
+                    finalY = edit.newY;
+                }
+
                 currentGroup = {
-                    loc: edit.loc,
-                    page: edit.page,
-                    x: edit.x,
-                    y: edit.y,
-                    relicId: (edit.action === 0 || edit.action === 1) ? edit.id : null,
-                    edits: [edit]
+                    loc: finalLoc,
+                    page: finalPage,
+                    x: finalX,
+                    y: finalY,
+                    relicId: relicInfo ? relicInfo.id : ((edit.action === 0 || edit.action === 1) ? edit.id : null),
+                    edits: [edit],
+                    // Tracking vars used for linking previous edits
+                    trackingLoc: edit.loc,
+                    trackingPage: edit.page,
+                    trackingX: edit.x,
+                    trackingY: edit.y
                 };
+                
+                activeGroups.set(key, currentGroup);
                 groups.push(currentGroup);
             }
-        });
 
-        // Reverse groups to show newest first
-        groups.reverse();
+            // If RelicAdded (Reverse: Removed/Disappeared), remove from map
+            if (edit.action === 0) {
+                itemMap.delete(key);
+                activeGroups.delete(key); // Stop tracking this group as it didn't exist before this
+            }
+        });
 
         // Resolve StatChanged deltas using current save file state
         const itemStates = {};

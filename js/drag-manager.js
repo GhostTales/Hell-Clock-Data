@@ -177,6 +177,11 @@ export class DragManager {
         if (targetType === 'reliquary') container = document.getElementById('reliquaryContainer');
         else container = document.getElementById('gridContainer');
 
+        const oldX = this.dragItem._position.x;
+        const oldY = this.dragItem._position.y;
+        const oldPage = this.dragItem._pageIndex;
+        const oldLoadout = (this.dragSource === 'main') ? this.editor.currentLoadoutIndex : undefined;
+
         const rect = container.getBoundingClientRect();
         
         let targetCellSize;
@@ -279,6 +284,18 @@ export class DragManager {
         
         if (this.dragSource === 'copy_mode') {
             this.editor.changelogManager.registerEdit(this.dragItem, "RelicAdded", { id: this.dragItem._relicBaseDefinitionID });
+        } else {
+            const newLocType = (targetType === 'reliquary') ? 1 : 0;
+            const newPage = (targetType === 'reliquary') ? this.editor.reliquaryPage : this.editor.currentLoadoutIndex;
+            this.editor.changelogManager.registerEdit(this.dragItem, "RelicMoved", {
+                oldPosition: { x: oldX, y: oldY },
+                oldPage: oldPage,
+                oldLoadout: oldLoadout,
+                newX: this.dragItem._position.x,
+                newY: this.dragItem._position.y,
+                newLoc: newLocType,
+                newPage: newPage
+            });
         }
 
         this.editor.selectedContainer = targetType;
