@@ -74,12 +74,7 @@ export class ChangelogManager {
                         return; // Don't add a new entry
                     }
                 } else if (action === "RelicAdded") {
-                    // If we are adding a relic, we can't merge previous stats into it anymore
-                    // because RelicAdded only holds the ID now.
-                    // However, we don't need to look back for RelicAdded.
-                    // But we should ensure we don't have duplicate adds.
-                    // (The logic below handles pushing the new event)
-                    pass;
+                    
                 } else if (action === "AffixRemoved") {
                     // If we are removing an affix we just added, cancel both out
                     if (prev.action === "AffixAdded" && prev.details && prev.details.id === details.id) {
