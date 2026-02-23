@@ -601,7 +601,25 @@ export class RelicModals {
                         if (idx !== -1) originalItemState._implicitAffixesData.splice(idx, 1);
                     }
                 } else if (edit.action === 3 && originalItemState) { // AffixRemoved -> Reverse: Add
-                    // Cannot perfectly reconstruct removed affix without roll data, skipping to avoid errors
+                    // Reconstruct removed affix with default roll (0.5). 
+                    // If a RollChanged event exists earlier in history, it will update this value.
+                    const cats = this.editor.dataManager.getAffixCategory(edit.id);
+                    const isImplicit = cats.length > 0;
+                    
+                    const newAffix = {
+                        _relicAffixDefinitionId: edit.id,
+                        _rollValue: 0.5,
+                        _locked: false,
+                        _tier: originalItemState._tier || 1
+                    };
+
+                    if (isImplicit) {
+                        if (!originalItemState._implicitAffixesData) originalItemState._implicitAffixesData = [];
+                        originalItemState._implicitAffixesData.push({ _relicAffixData: newAffix, _eImplicitAffixCategory: cats[0] });
+                    } else {
+                        if (!originalItemState._affixesData) originalItemState._affixesData = [];
+                        originalItemState._affixesData.push(newAffix);
+                    }
                 }
             }
 
