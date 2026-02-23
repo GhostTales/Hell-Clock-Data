@@ -3,6 +3,7 @@ import { secureReviver, formatString, getEnglishTranslation } from './utils.js';
 export class RelicDataManager {
     constructor(editor) {
         this.editor = editor;
+        this.currentFileName = "PlayerSave0.json";
         this.data = {
             save: null,
             relics: null,
@@ -203,6 +204,7 @@ export class RelicDataManager {
     loadSaveFile(input) {
         const file = input.files[0];
         if (!file) return;
+        this.currentFileName = file.name;
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -266,7 +268,7 @@ export class RelicDataManager {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data.save, null, 4));
         const a = document.createElement('a');
         a.href = dataStr;
-        a.download = "PlayerSave0.json";
+        a.download = this.currentFileName;
         document.body.appendChild(a);
         a.click();
         a.remove();
