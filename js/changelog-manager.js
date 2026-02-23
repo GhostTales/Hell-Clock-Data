@@ -33,6 +33,36 @@ export class ChangelogManager {
             else delete itemSnapshot._loadoutIndex;
         }
 
+        // Optimization: Merge subsequent RelicMoved events
+        if (action === "RelicMoved" && this.edits.length > 0) {
+            const lastEdit = this.edits[this.edits.length - 1];
+            if (lastEdit.action === "RelicMoved" && 
+                lastEdit.item._relicBaseDefinitionID === itemSnapshot._relicBaseDefinitionID) {
+                
+                const prevDestX = lastEdit.details.newX;
+                const prevDestY = lastEdit.details.newY;
+                const prevDestLoc = lastEdit.details.newLoc;
+                const prevDestPage = lastEdit.details.newPage;
+
+                const currSrcX = itemSnapshot._position.x;
+                const currSrcY = itemSnapshot._position.y;
+                const currSrcLoc = (itemSnapshot._pageIndex !== undefined && itemSnapshot._pageIndex !== null) ? 1 : 0;
+                const currSrcPage = (currSrcLoc === 1) ? itemSnapshot._pageIndex : (itemSnapshot._loadoutIndex || 0);
+
+                const match = (prevDestX === currSrcX && prevDestY === currSrcY && prevDestLoc === currSrcLoc) &&
+                              (prevDestPage === undefined || prevDestPage === currSrcPage);
+
+                if (match) {
+                    lastEdit.details.newX = details.newX;
+                    lastEdit.details.newY = details.newY;
+                    lastEdit.details.newLoc = details.newLoc;
+                    lastEdit.details.newPage = details.newPage;
+                    lastEdit.timestamp = Date.now();
+                    return;
+                }
+            }
+        }
+
         // Optimization: Remove redundant previous edits for the same target to save space and keep history clean
             for (let i = this.edits.length - 1; i >= 0; i--) {
                 const prev = this.edits[i];
