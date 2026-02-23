@@ -518,6 +518,19 @@ export class RelicModals {
                 });
             }
 
+            // Clone for Original State reconstruction
+            let originalItemState = foundItem ? JSON.parse(JSON.stringify(foundItem)) : null;
+            if (!originalItemState && group.relicId !== null) {
+                originalItemState = {
+                    _relicBaseDefinitionID: group.relicId,
+                    _tier: 1,
+                    _eRelicRarity: 0,
+                    _upgradeLevel: 0,
+                    _affixesData: [],
+                    _implicitAffixesData: []
+                };
+            }
+
             for (let i = group.edits.length - 1; i >= 0; i--) {
                 const edit = group.edits[i];
                 if (edit.action === 5) {
@@ -525,6 +538,12 @@ export class RelicModals {
                         if (edit.changes.tier) currentStats.tier = edit.changes.tier.old;
                         if (edit.changes.rarity) currentStats.rarity = edit.changes.rarity.old;
                         if (edit.changes.level) currentStats.level = edit.changes.level.old;
+
+                        if (originalItemState) {
+                            if (edit.changes.tier) originalItemState._tier = edit.changes.tier.old;
+                            if (edit.changes.rarity) originalItemState._eRelicRarity = edit.changes.rarity.old;
+                            if (edit.changes.level) originalItemState._upgradeLevel = edit.changes.level.old;
+                        }
                     } else if (edit.statDeltas) {
                         const inferred = {};
                         let hasChange = false;
@@ -532,16 +551,19 @@ export class RelicModals {
                             inferred.tier = { new: currentStats.tier, old: currentStats.tier - edit.statDeltas.tier };
                             currentStats.tier = inferred.tier.old;
                             hasChange = true;
+                            if (originalItemState) originalItemState._tier -= edit.statDeltas.tier;
                         }
                         if (edit.statDeltas.rarity !== 0) {
                             inferred.rarity = { new: currentStats.rarity, old: currentStats.rarity - edit.statDeltas.rarity };
                             currentStats.rarity = inferred.rarity.old;
                             hasChange = true;
+                            if (originalItemState) originalItemState._eRelicRarity -= edit.statDeltas.rarity;
                         }
                         if (edit.statDeltas.level !== 0) {
                             inferred.level = { new: currentStats.level, old: currentStats.level - edit.statDeltas.level };
                             currentStats.level = inferred.level.old;
                             hasChange = true;
+                            if (originalItemState) originalItemState._upgradeLevel -= edit.statDeltas.level;
                         }
                         if (hasChange) edit._inferredChanges = inferred;
                     }
@@ -554,6 +576,32 @@ export class RelicModals {
                         edit._inferredChanges = { old: oldVal, new: currentVal };
                         currentStats.affixes[edit.id] = oldVal;
                     }
+
+                    if (originalItemState) {
+                        const updateRoll = (list, isImp) => {
+                            if (!list) return;
+                            list.forEach(a => {
+                                const data = isImp ? a._relicAffixData : a;
+                                if (data._relicAffixDefinitionId === edit.id) {
+                                    if (edit.changes && edit.changes.old !== null) data._rollValue = edit.changes.old;
+                                    else if (edit.rollDelta !== undefined) data._rollValue -= edit.rollDelta;
+                                }
+                            });
+                        };
+                        updateRoll(originalItemState._affixesData, false);
+                        updateRoll(originalItemState._implicitAffixesData, true);
+                    }
+                } else if (edit.action === 2 && originalItemState) { // AffixAdded -> Reverse: Remove
+                    if (originalItemState._affixesData) {
+                        const idx = originalItemState._affixesData.findIndex(a => a._relicAffixDefinitionId === edit.id);
+                        if (idx !== -1) originalItemState._affixesData.splice(idx, 1);
+                    }
+                    if (originalItemState._implicitAffixesData) {
+                        const idx = originalItemState._implicitAffixesData.findIndex(a => a._relicAffixData._relicAffixDefinitionId === edit.id);
+                        if (idx !== -1) originalItemState._implicitAffixesData.splice(idx, 1);
+                    }
+                } else if (edit.action === 3 && originalItemState) { // AffixRemoved -> Reverse: Add
+                    // Cannot perfectly reconstruct removed affix without roll data, skipping to avoid errors
                 }
             }
 
@@ -565,11 +613,43 @@ export class RelicModals {
                     <span class="changelog-arrow" style="display:inline-block; width:12px; text-align:center; transition:transform 0.2s; color:var(--text-muted);">▼</span>
                     ${iconPath ? `<img src="${iconPath}" style="width:24px; height:24px; object-fit:contain;">` : ''}
                     <span style="font-weight:600; color:var(--text-color);">${relicName}</span>
-                    <span style="color:var(--text-muted); font-size:0.8em; font-weight:normal;">(${group.edits.length})</span>
+                    <span style="color:var(--text-muted); font-size:0.8em; font-weight:normal;">(${group.edits.length} edits)</span>
                 </div>
-                <div style="font-family:monospace; font-size:0.8em; color:var(--text-muted);">${locStr} ${coords}</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="font-family:monospace; font-size:0.8em; color:var(--text-muted);">${locStr} ${coords}</div>
+                    <button class="btn-add btn-compare" style="width:auto; padding:2px 8px; font-size:0.75em; background-color:#21262d; border-color:var(--border-color);">Compare</button>
+                </div>
             `;
             groupHeader.appendChild(headerTop);
+
+            // Comparison View
+            const comparisonDiv = document.createElement('div');
+            comparisonDiv.className = 'comparison-view';
+            comparisonDiv.style.display = 'none';
+            
+            if (originalItemState) {
+                const originalHTML = this.editor.tooltipManager.generateTooltipHTML(originalItemState);
+                const currentHTML = foundItem ? this.editor.tooltipManager.generateTooltipHTML(foundItem) : "<div style='padding:20px; text-align:center; color:var(--text-muted);'>Item Deleted</div>";
+
+                comparisonDiv.innerHTML = `
+                    <div class="comparison-card">
+                        <div class="comparison-title">Original</div>
+                        ${originalHTML}
+                    </div>
+                    <div class="comparison-card">
+                        <div class="comparison-title">Current</div>
+                        ${currentHTML}
+                    </div>
+                `;
+            } else {
+                comparisonDiv.innerHTML = "<div style='padding:10px; color:var(--text-muted);'>Cannot reconstruct original state.</div>";
+            }
+            groupHeader.appendChild(comparisonDiv);
+
+            headerTop.querySelector('.btn-compare').onclick = (e) => {
+                e.stopPropagation();
+                comparisonDiv.style.display = comparisonDiv.style.display === 'none' ? 'flex' : 'none';
+            };
 
             // Edits List
             const editsList = document.createElement('div');

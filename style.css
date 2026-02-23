@@ -1213,3 +1213,35 @@ input[type="checkbox"]:focus {
 .changelog-group-header:hover {
     background-color: rgba(255, 255, 255, 0.05) !important;
 }
+
+.comparison-view {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid var(--border-color);
+    justify-content: center;
+}
+
+.comparison-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    flex: 1;
+    max-width: 300px;
+    font-size: 0.85rem;
+    color: var(--text-color);
+}
+
+.comparison-title {
+    text-align: center;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.8em;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 5px;
+}

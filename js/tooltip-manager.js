@@ -7,11 +7,10 @@ export class TooltipManager {
         this.tooltipEl = document.getElementById('relicTooltip');
     }
 
-    showTooltip(e, item) {
-        if (this.editor.dragManager && this.editor.dragManager.isDragging) return;
-        if (!this.tooltipEl) this.tooltipEl = document.getElementById('relicTooltip');
-        
+    generateTooltipHTML(item) {
         const def = this.editor.dataManager.definitions.relics[item._relicBaseDefinitionID];
+        if (!def) return "Unknown Item";
+
         const tier = item._tier || 1;
         const level = item._upgradeLevel || 0;
 
@@ -68,7 +67,14 @@ export class TooltipManager {
             html += `</div>`;
         }
 
-        this.tooltipEl.innerHTML = html;
+        return html;
+    }
+
+    showTooltip(e, item) {
+        if (this.editor.dragManager && this.editor.dragManager.isDragging) return;
+        if (!this.tooltipEl) this.tooltipEl = document.getElementById('relicTooltip');
+        
+        this.tooltipEl.innerHTML = this.generateTooltipHTML(item);
         this.tooltipEl.style.display = 'block';
         this.moveTooltip(e);
     }
