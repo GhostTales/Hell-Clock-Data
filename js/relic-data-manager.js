@@ -226,7 +226,10 @@ export class RelicDataManager {
                     this.reliquaryItems = [];
                 }
 
-                this.edits = []; // Reset edits on load
+                if (this.editor.changelogManager) {
+                    this.editor.changelogManager.edits = [];
+                    this.editor.changelogManager.appliedWatermarks = [];
+                }
                 this.editor.initEditorUI();
             } catch (err) {
                 alert(`Error parsing save file: ${err.message}`);
