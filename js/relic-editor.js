@@ -318,10 +318,16 @@ class RelicEditor {
 
         this.renderer.renderRelicContent(el, def, newRelic._tier, newRelic._eRelicRarity, newRelic._upgradeLevel);
         
+        // Apply virtual resolution scale to the drag helper
+        const scale = window.appScale || 1;
+        el.style.transform = `scale(${scale})`;
+        el.style.transformOrigin = 'top left';
+
         el.style.position = 'fixed';
         el.style.zIndex = 9999;
-        el.style.left = `${e.clientX - (parseInt(el.style.width)/2)}px`; 
-        el.style.top = `${e.clientY - (parseInt(el.style.height)/2)}px`;
+        // Center the element on the mouse, accounting for the scale
+        el.style.left = `${e.clientX - ((parseInt(el.style.width) * scale) / 2)}px`; 
+        el.style.top = `${e.clientY - ((parseInt(el.style.height) * scale) / 2)}px`;
         el.style.pointerEvents = 'none';
 
         document.body.appendChild(el);

@@ -8,6 +8,7 @@
 </head>
 <body>
 
+<div id="app-scale-wrapper">
 <div class="header">
     <h3>Relic Loadout Editor</h3>
     <div style="flex:1"></div>
@@ -215,8 +216,7 @@
     </div>
 </div>
 
-<div id="relicTooltip"></div>
-
+</div>
 
 <script>
     function togglePanel(panelName) {
@@ -239,6 +239,54 @@
             if (panelName === 'reliquary' && window.app) window.app.renderReliquary();
         }
     }
+</script>
+<div id="relicTooltip"></div>
+<script>
+    // Virtual Resolution Scaling (Target: 1440p)
+    (function() {
+        const baseHeight = 1280; // Adjusted for 1440p viewport (minus browser chrome)
+        const wrapper = document.getElementById('app-scale-wrapper');
+        let userZoom = parseFloat(localStorage.getItem('relicEditorZoom')) || 1.0;
+        
+        function resize() {
+            const fitScale = window.innerHeight / baseHeight;
+            const finalScale = fitScale * userZoom;
+            
+            wrapper.style.transform = `scale(${finalScale})`;
+            wrapper.style.width = `${Math.ceil(window.innerWidth / finalScale)}px`;
+            wrapper.style.height = `${Math.ceil(window.innerHeight / finalScale)}px`;
+            
+            window.appScale = finalScale;
+            document.body.style.setProperty('--app-scale', finalScale);
+        }
+
+        function adjustZoom(delta) {
+            userZoom *= delta;
+            userZoom = Math.min(Math.max(0.5, userZoom), 3.0);
+            localStorage.setItem('relicEditorZoom', userZoom);
+            resize();
+        }
+
+        // Intercept Ctrl+Scroll for custom zoom
+        window.addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                adjustZoom(e.deltaY < 0 ? 1.1 : 0.9);
+            }
+        }, { passive: false });
+
+        // Intercept Ctrl +/-/0
+        window.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
+                e.preventDefault();
+                if (e.key === '0') { userZoom = 1.0; localStorage.setItem('relicEditorZoom', 1.0); resize(); }
+                else adjustZoom(e.key === '-' ? 0.9 : 1.1);
+            }
+        });
+        
+        window.addEventListener('resize', resize);
+        resize();
+    })();
 </script>
 <script type="module" src="js/relic-editor.js"></script>
 </body>
