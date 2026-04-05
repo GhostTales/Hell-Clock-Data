@@ -62,7 +62,7 @@ async function initWiki() {
     try {
         // Fetch data files in parallel, stepping back one directory to find json_data
         const [rawMonoData, lookupData, textureLookupData, eStatDefData, modifierTypeData] = await Promise.all([
-            fetchRequiredJson('../json_data/monoBehaviour.json'),
+            fetchRequiredJson('../json_data/monoBehaviour.min.json'),
             fetchOptionalJson('../json_data/guid_lookup.json'),
             fetchOptionalJson('../json_data/texture_guid_lookup.json'),
             fetchOptionalJson('../json_data/eStatDefinition.json', []),
