@@ -1266,3 +1266,23 @@ input[type="checkbox"]:focus {
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 5px;
 }
+
+/* Add these layout rules to your style.css */
+
+.wiki-container { 
+    display: flex; 
+    height: 100vh; /* Makes the container take up the full window height */
+    overflow: hidden; /* Prevents the whole page from scrolling, letting sections scroll individually */
+}
+
+.sidebar { 
+    width: 300px; /* Fixed width for the sidebar */
+    overflow-y: auto; /* Allows the sidebar to scroll independently */
+    border-right: 1px solid #333; /* Optional divider */
+}
+
+.content { 
+    flex: 1; /* Allows the main content to fill the remaining width to the right */
+    overflow-y: auto; /* Allows the content area to scroll independently */
+    padding: 20px; /* Optional spacing around the text/tables */
+}
