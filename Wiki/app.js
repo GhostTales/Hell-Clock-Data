@@ -46,17 +46,29 @@ async function initWiki() {
         }
     };
 
+    const fetchRequiredJson = async (url) => {
+        try {
+            const res = await fetch(url, { cache: "no-cache" });
+            if (!res.ok) {
+                throw new Error(`HTTP error! Status: ${res.status}`);
+            }
+            return await res.json();
+        } catch (err) {
+            console.error(`Error loading or parsing ${url}:`, err);
+            throw new Error(`Failed to fetch required file "${url}". Details: ${err.message}`);
+        }
+    };
+
     try {
         // Fetch data files in parallel, stepping back one directory to find json_data
-        const [monoRes, lookupData, textureLookupData, eStatDefData, modifierTypeData] = await Promise.all([
-            fetch('../json_data/monoBehaviour.json'),
+        const [rawMonoData, lookupData, textureLookupData, eStatDefData, modifierTypeData] = await Promise.all([
+            fetchRequiredJson('../json_data/monoBehaviour.json'),
             fetchOptionalJson('../json_data/guid_lookup.json'),
             fetchOptionalJson('../json_data/texture_guid_lookup.json'),
             fetchOptionalJson('../json_data/eStatDefinition.json', []),
             fetchOptionalJson('../json_data/modifierType.json', [])
         ]);
 
-        const rawMonoData = await monoRes.json();
         db.lookup = lookupData;
         db.textureLookup = textureLookupData;
         db.eStatDefinition = eStatDefData;
@@ -75,7 +87,6 @@ async function initWiki() {
         console.error("Wiki Initialization Error:", error);
         document.getElementById('mainContent').innerHTML = `
             <h2>Error loading data</h2>
-            <p>Make sure you are running a local web server.</p>
             <p>Error details: ${error.message}</p>
         `;
     }
@@ -105,12 +116,16 @@ function processData(rawMonoData) {
         const id = mb.GUID || mb.m_Name;
         if (!id) return;
 
+        const isMNameGuid = guidRegex.test(mb.m_Name || "");
+
         // Attempt to find a human-readable title
-        const title = mb._nameLocalizationKey 
+        // Prioritize m_Name if it is a descriptive name (not a GUID). Otherwise fallback to localization.
+        const title = (!isMNameGuid && mb.m_Name) ? mb.m_Name : (
+                      mb._nameLocalizationKey 
                    || mb._localizationKey 
                    || mb._descriptionLocalizationKey
                    || (db.lookup && db.lookup[id])
-                   || mb.m_Name;
+                   || mb.m_Name);
 
         const itemData = {
             id: id,
@@ -125,10 +140,12 @@ function processData(rawMonoData) {
 
         // 2. Filter for the Sidebar List
         const isGuid = guidRegex.test(title);
-        const isDuplicate = seenTitles.has(title);
 
-        if (!isGuid && !isDuplicate && title) {
-            seenTitles.add(title);
+        if (!isGuid && title) {
+            if (seenTitles.has(title)) {
+                itemData.title = `${title} (${id})`;
+            }
+            seenTitles.add(itemData.title);
             db.list.push(itemData);
         }
     });
