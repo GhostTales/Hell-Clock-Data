@@ -1,7 +1,7 @@
 import json
 
 print("Loading original JSON...")
-with open('monoBehaviour.json', 'r', encoding='utf-8') as f:
+with open('monoBehaviour-deduplicated.json', 'r', encoding='utf-8') as f:
     raw_data = json.load(f)
 
 # The exact keys your app.js is ignoring
