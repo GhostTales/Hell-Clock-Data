@@ -591,7 +591,7 @@ function generateObjectHTML(obj) {
 
     for (const [key, value] of Object.entries(obj)) {
         // Hide Unity metadata noise that isn't useful for a wiki
-        if (['m_ObjectHideFlags', 'm_CorrespondingSourceObject', 'm_PrefabInstance', 'm_PrefabAsset', 'm_GameObject', 'm_EditorClassIdentifier', 'm_EditorHideFlags', 'm_Enabled'].includes(key)) {
+        if (['m_ObjectHideFlags', 'm_CorrespondingSourceObject', 'm_PrefabInstance', 'm_PrefabAsset', 'm_GameObject', 'm_EditorClassIdentifier', 'm_EditorHideFlags', 'm_Enabled', 'm_Script'].includes(key)) {
             continue; 
         }
 
