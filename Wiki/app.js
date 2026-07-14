@@ -530,7 +530,7 @@ function generateObjectHTML(obj) {
             let textureHtml = '';
             if (db.textureLookup && db.textureLookup[obj.guid]) {
                 const texName = db.textureLookup[obj.guid];
-                textureHtml = `<div class="wiki-sprite-wrapper" title="${texName}"><img src="../Texture2D/${texName}.png" class="wiki-sprite-preview" alt="${texName}" loading="lazy"></div>`;
+                textureHtml = `<div class="wiki-sprite-wrapper" title="${texName}"><img src="../icons/${texName}.png" class="wiki-sprite-preview" alt="${texName}" loading="lazy"></div>`;
             }
 
             let refHtml = '';

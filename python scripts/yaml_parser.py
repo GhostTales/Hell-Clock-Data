@@ -15,17 +15,21 @@ def parse_file(file_path):
         with open(filepath, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.startswith('--- !u!'):
-                    # Keep only the type, remove the Unity ID & tags
-                    result += '--- ' + line.split(' ')[2] + '\n'
+                    tokens = line.strip().split()
+                    if len(tokens) >= 3:
+                        result += '--- ' + tokens[2] + '\n'
+                    else:
+                        result += '--- \n'
                 else:
-                    # Quote _devotionAffinity to prevent octal/large int parsing
                     if line.strip().startswith('_devotionAffinity:') or line.strip().startswith('_imbueCategories:'):
                         key, value = line.split(':', 1)
-                        value = value.strip()
-                        if not (value.startswith('"') or value.startswith("'")):
-                            value = (f'"{value}"' if value else 'null')
-                        result += f"{key}: {value}\n"
-                    # Fix bare '=' or other weird scalars by quoting them
+                        cleaned_value = value.strip()
+                        if cleaned_value:
+                            if not (cleaned_value.startswith('"') or cleaned_value.startswith("'")):
+                                cleaned_value = f'"{cleaned_value}"'
+                            result += f"{key}: {cleaned_value}\n"
+                        else:
+                            result += line
                     elif line.strip().endswith('=') and ':' in line:
                         key = line.split(':')[0]
                         result += f'{key}: "="\n'
@@ -33,11 +37,27 @@ def parse_file(file_path):
                         result += line
         return result
 
-    # Use FullLoader but safe handling of strange scalars
+    cleaned_yaml = removeUnityTagAlias(file_path)
     try:
-        nodes = list(yaml.load_all(removeUnityTagAlias(file_path), Loader=CLoader))
+        nodes = list(yaml.load_all(cleaned_yaml, Loader=CLoader))
     except yaml.YAMLError as e:
-        print("YAML parse error:", e)
+        print(f"\n[ERROR] {file_path.name}: {e}")
+        
+        # Extract line number to print the malformed context
+        import re
+        match = re.search(r"line (\d+)", str(e))
+        if match:
+            target_line = int(match.group(1))
+            yaml_lines = cleaned_yaml.splitlines()
+            start = max(0, target_line - 4)
+            end = min(len(yaml_lines), target_line + 4)
+            
+            print(f"--- Context (Lines {start+1} to {end}) ---")
+            for idx in range(start, end):
+                marker = "-> " if idx == target_line - 1 else "   "
+                print(f"{marker}{idx+1}: {yaml_lines[idx]}")
+            print("-" * 40)
+            
         nodes = []
 
     return nodes
@@ -78,16 +98,14 @@ def build_guid_lookup(project_folder):
     return guid_lookup
 
 if __name__ == "__main__":
-    folder = Path(
-        r"C:\Users\Ghost-Tales\Desktop\hell clock export\AssetRipper_export_20251208_195719\ExportedProject\Assets\MonoBehaviour")
+    assets_root = Path(r"AssetRipper_export_20260713_121158/ExportedProject/Assets")
+    mono_folder = assets_root / "MonoBehaviour"
 
-    all_data = parse_folder(folder)
-    guid_lookup = build_guid_lookup(folder)
+    all_data = parse_folder(mono_folder)
+    guid_lookup = build_guid_lookup(assets_root)  # Scans all subdirectories for .meta files
 
-    #print(json.dumps(all_data, indent=4))
-    with open("json_data/monoBehaviour.json", "w") as json_file:
+    with open("monoBehaviour.json", "w") as json_file:
         json.dump(all_data, json_file, indent=4)
 
-    #print(json.dumps(guid_lookup, indent=4))
-    with open("json_data/guid_lookup.json", "w") as json_file:
+    with open("guid_lookup.json", "w") as json_file:
         json.dump(guid_lookup, json_file, indent=4)

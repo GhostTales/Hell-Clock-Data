@@ -2,8 +2,8 @@ import json
 import re
 from pathlib import Path
 
-monoBehaviourPath = Path(r"C:\Users\Ghost-Tales\Desktop\hell clock scripts v2\json_data\monoBehaviour.json")
-guidLookupPath = Path(r"C:\Users\Ghost-Tales\Desktop\hell clock scripts v2\json_data\guid_lookup.json")
+monoBehaviourPath = Path(r"monoBehaviour.json")
+guidLookupPath = Path(r"guid_lookup.json")
 
 with open(monoBehaviourPath) as json_data:
     monoBehaviours = json.load(json_data)
@@ -38,12 +38,18 @@ def treasureClassFormater():
             tData = t.get("_t")
             #print(tData)
             if "_treasureClass" in tData:
-                tName = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[tData.get("_treasureClass").get("guid")])
-
+                target_guid = tData.get("_treasureClass").get("guid")
             elif "_currencyDefinition" in tData:
-                tName = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[tData.get("_currencyDefinition").get("guid")])
+                target_guid = tData.get("_currencyDefinition").get("guid")
             else:
-                tName = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[tData.get("guid")])
+                target_guid = tData.get("guid")
+
+            guid_name = guidLookup.get(target_guid)
+            if not guid_name:
+                print(f"[WARNING] Missing GUID in lookup: {target_guid}")
+                continue
+
+            tName = re.sub(r'(_0|_1|\.asset)+$', '', guid_name)
 
             multiplier = None
 
@@ -133,6 +139,6 @@ if __name__ == "__main__":
 
     data = treasureClassFormater()
 
-    print(json.dumps(data, indent=4))
-    with open("json_data/treasure_class_data.json", "w") as json_file:
+    #print(json.dumps(data, indent=4))
+    with open("treasure_class_data.json", "w") as json_file:
         json.dump(data, json_file, indent=4)

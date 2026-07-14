@@ -3,8 +3,8 @@ import re
 from pathlib import Path
 from collections import Counter
 
-monoBehaviourPath = Path(r"json_data\monoBehaviour.json")
-guidLookupPath = Path(r"json_data\guid_lookup.json")
+monoBehaviourPath = Path(r"monoBehaviour.json")
+guidLookupPath = Path(r"guid_lookup.json")
 
 used_monobehaviours = []
 
@@ -114,6 +114,10 @@ def dropbalance_class_formater():
                         continue
                     name = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[guid])
                     mono = find_monobehavior_by_name(name)
+
+                    if not mono:
+                        continue
+
                     if key_index not in per_type_dicts:
                         per_type_dicts[key_index] = {}
                     per_type_dicts[key_index][name] = format_child_treasure_class(mono)
@@ -166,8 +170,16 @@ def dropbalance_class_formater():
                 if not sub_treasure_guid:
                     continue
 
+                guid_name = guidLookup.get(sub_treasure_guid)
+                if not guid_name:
+                    print(f"[WARNING] Missing GUID in lookup: {sub_treasure_guid}")
+                    continue
+
                 sub_treasure_name = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[sub_treasure_guid])
                 sub_treasure_mono = find_monobehavior_by_name(sub_treasure_name)
+
+                if not sub_treasure_mono:
+                    continue
 
                 devotionAffinity = parse_devotion(sub_treasure_mono.get("_devotionAffinity"))
 
@@ -238,6 +250,11 @@ def dropbalance_class_formater():
                             continue
                         name = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[guid])
                         mono = find_monobehavior_by_name(name)
+
+                        # Add this guard clause
+                        if not mono:
+                            continue
+
                         tc_dict[name] = format_child_treasure_class(mono)
                     continue
 
@@ -251,6 +268,11 @@ def dropbalance_class_formater():
 
                 name = re.sub(r'(_0|_1|\.asset)+$', '', guidLookup[guid])
                 mono = find_monobehavior_by_name(name)
+
+                # Add this guard clause
+                if not mono:
+                    continue
+
                 tc_dict[name] = format_child_treasure_class(mono)
 
             floors[f"_floor{config.get('_floor')}"] = tc_dict
@@ -317,7 +339,7 @@ if __name__ == "__main__":
     data, used_monos = dropbalance_class_formater()
     used_monobehaviours.append(used_monos)
 
-    with open("json_data/dropbalance_data.json", "w") as json_file:
+    with open("dropbalance_data.json", "w") as json_file:
         json.dump(data, json_file, indent=4, allow_nan=False, separators=(',', ':'), ensure_ascii=False)
-    with open("json_data/dropbalance_monobehaviours.json", "w") as json_file:
+    with open("dropbalance_monobehaviours.json", "w") as json_file:
         json.dump(used_monobehaviours, json_file, indent=4, allow_nan=False, separators=(',', ':'), ensure_ascii=False)

@@ -65,24 +65,27 @@ def verify(input_file, dedup_file):
     with open(dedup_file, 'r', encoding='utf-8') as f:
         dedup = json.load(f)
 
-    original_counts = Counter(make_hashable(x) for x in original)
-    dedup_counts = Counter(make_hashable(x) for x in dedup)
+    # Check 1: Output matches the deduplication logic exactly
+    if deduplicate(original) != dedup:
+        print("FAIL: Deduplicated file content does not match expected deduplication output.")
+        return
 
-    # Check that all deduplicated items exist in the original
-    missing = [item for item in dedup_counts if item not in original_counts]
+    # Check 2: Ensure no unique primitive data was lost or added
+    def extract_primitives(obj):
+        if isinstance(obj, list):
+            return [p for x in obj for p in extract_primitives(x)]
+        if isinstance(obj, dict):
+            return [p for v in obj.values() for p in extract_primitives(v)]
+        return [obj]
 
-    if missing:
-        print(f"FAIL: Some items in deduplicated file were not in original ({len(missing)} items).")
+    orig_primitives = set(extract_primitives(original))
+    dedup_primitives = set(extract_primitives(dedup))
+
+    if orig_primitives != dedup_primitives:
+        print("FAIL: Unique primitive data changed during deduplication.")
     else:
-        print("PASS: All deduplicated items exist in original file.")
-
-    # Optional: check that counts in dedup ≤ counts in original
-    overcounted = [item for item, count in dedup_counts.items() if count > original_counts[item]]
-    if overcounted:
-        print(f"FAIL: Some items appear more times in deduplicated file than in original ({len(overcounted)} items).")
-    else:
-        print("Counts check passed: deduplicated counts are ≤ original counts.")
+        print("PASS: All checks passed. File matches deduplication logic, and data integrity is preserved.")
 
 # usage
-#process_file('monoBehaviour.json', 'monoBehaviour-deduplicated.json')
+process_file('monoBehaviour.json', 'monoBehaviour-deduplicated.json')
 verify('monoBehaviour.json', 'monoBehaviour-deduplicated.json')
