@@ -199,7 +199,7 @@ async function loadPage(pageName) {
         mainContent.innerHTML = `
             <div class="page-header">
                 <h1>${pageTitle}</h1>
-                <button id="viewSourceBtn" class="wiki-button">View Source</button>
+                <button id="viewSourceBtn" class="tool-button">View Source</button>
             </div>
             <div id="pageContent">${parsedHtml}</div>`;
 

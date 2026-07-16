@@ -16,7 +16,7 @@ export async function createDungeonTemplate(dungeon) {
         const sortedFloors = [...dungeon.dropBalance.floorDropConfigs].sort((a, b) => a.floor - b.floor);
 
         for (const floorConfig of sortedFloors) {
-            floorsHtml += `<h3 class="wiki-heading">Floor ${floorConfig.floor}</h3>`;
+            floorsHtml += `<h3 class="tool-heading">Floor ${floorConfig.floor}</h3>`;
             
             const tcRefs = {
                 "Regular Enemy": floorConfig.regularEnemyTreasureClass,

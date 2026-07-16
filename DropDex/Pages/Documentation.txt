@@ -1,4 +1,4 @@
-<p>This page explains the special formatting and functions used across the wiki.</p>
+<p>This page explains the special formatting and functions used across the tool.</p>
 
 <h2>Templating Engine</h2>
 <p>The tool uses the <a href="https://ejs.co/" target="_blank" rel="noopener noreferrer">EJS (Embedded JavaScript)</a> templating engine. This means you can write standard HTML and embed JavaScript function calls to display dynamic game data.</p>
