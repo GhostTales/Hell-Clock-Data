@@ -1,0 +1,9 @@
+<% const safeTitle = itemTitle; %>
+<% const relic = allRelics.find(r => (getEnLoc(r.nameLocalizationKey) || r.name).toLowerCase() === safeTitle.toLowerCase()); %>
+<% if (relic) { %>
+    <%- await createRelicTemplate(relic, allAffixData, allSkills) %>
+    <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics) %>
+    <%- await createRelicInTreasureTemplate(relic, allTCs, allRelics) %>
+<% } else { %>
+    <p>Relic not found: <%= itemTitle %></p>
+<% } %>

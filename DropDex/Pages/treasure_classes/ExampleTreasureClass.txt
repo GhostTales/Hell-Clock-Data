@@ -1,0 +1,19 @@
+<% const tc = allTCs.find(t => t.id === 201); %>
+<% if (tc) { %>
+    <%# The infobox is rendered first to allow the following text to wrap around it. %>
+    <%- await createTreasureClassTemplate(tc, allTCs, allRelics) %>
+    
+    <p>This is an example of a custom page for a specific Treasure Class (ID 201). It uses EJS to find the TC and then calls template functions to display its information.</p>
+
+    <%- await createDungeonListTemplate(allDungeons, tc) %>
+<% } else { %>
+    <p>Treasure Class with ID 201 not found.</p>
+<% } %>
+<hr>
+<h2>Page Source</h2>
+<p>Here is the EJS source code used to generate this page's content. Note that the descriptive paragraph and this source view are also part of the page's source, but are omitted here for clarity.</p>
+<pre><code>&lt;% const tc = allTCs.find(t => t.id === 201); %&gt;
+&lt;% if (tc) { %&gt;
+    &lt;%- await createTreasureClassTemplate(tc, allTCs, allRelics) %&gt;
+    &lt;%- await createDungeonListTemplate(allDungeons, tc) %&gt;
+&lt;% } %&gt;</code></pre>

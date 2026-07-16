@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Community Relics",
+    "path": "relics/Community Relics"
+  },
+  {
+    "name": "Documentation",
+    "path": "Documentation"
+  },
+  {
+    "name": "Dungeon List",
+    "path": "DungeonList"
+  },
+  {
+    "name": "Example Custom Relic List",
+    "path": "relics/ExampleCustomRelicList"
+  },
+  {
+    "name": "Example Relic Page",
+    "path": "relics/ExampleRelicPage"
+  },
+  {
+    "name": "Example Treasure Class",
+    "path": "treasure_classes/ExampleTreasureClass"
+  },
+  {
+    "name": "Examples",
+    "path": "Examples"
+  },
+  {
+    "name": "Main Page",
+    "path": "MainPage"
+  },
+  {
+    "name": "Nightmare Relics",
+    "path": "relics/Nightmare Relics"
+  },
+  {
+    "name": "Relics List",
+    "path": "RelicsList"
+  },
+  {
+    "name": "Treasure Classes List",
+    "path": "TreasureClassesList"
+  },
+  {
+    "name": "Uber Relics",
+    "path": "relics/Uber Relics"
+  }
+]

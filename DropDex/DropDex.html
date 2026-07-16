@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/ejs@3.1.9/ejs.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hell Clock DropDex</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="wiki-container">
+        <aside class="sidebar">
+            <h2>Navigation</h2>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search..." autocomplete="off">
+                <div id="searchResults"></div>
+            </div>
+            <div class="devotion-container">
+                <h4>Devotion Points</h4>
+                <div class="devotion-input">
+                    <label for="furyPoints">Fury</label>
+                    <input type="number" id="furyPoints" value="0" min="0">
+                </div>
+                <div class="devotion-input">
+                    <label for="disciplinePoints">Discipline</label>
+                    <input type="number" id="disciplinePoints" value="0" min="0">
+                </div>
+                <div class="devotion-input">
+                    <label for="faithPoints">Faith</label>
+                    <input type="number" id="faithPoints" value="0" min="0">
+                </div>
+            </div>
+            <nav>
+                <ul>
+                    <!-- Example of how to link to pages -->
+                    <li><a href="?page=MainPage">Main Page</a></li>
+                    <li><a href="?page=RelicsList">Relics List</a></li>
+                    <li><a href="?page=TreasureClassesList">Treasure Classes List</a></li>
+                    <li><a href="?page=DungeonList">Dungeon List</a></li>
+                    <li><a href="?page=Documentation">Documentation</a></li>
+                    <li><a href="?page=Examples">Examples</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="content" id="mainContent">
+            <!-- Content will be loaded here by JavaScript -->
+        </main>
+    </div>
+
+    <script type="module" src="app.js"></script>
+
+</body>
+</html>

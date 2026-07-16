@@ -1,0 +1,6 @@
+<p>This page shows examples of how to create custom pages that display specific item information using EJS.</p>
+<ul>
+    <li><a href="?page=relics/ExampleRelicPage">Example Relic Page (Relic ID 11)</a></li>
+    <li><a href="?page=treasure_classes/ExampleTreasureClass">Example Treasure Class Page (TC ID 201)</a></li>
+    <li><a href="?page=relics/ExampleCustomRelicList">Example Custom Relic List</a></li>
+</ul>

@@ -1,0 +1,9 @@
+<h2>List of all unique relics</h2>
+<p>All relics are shown as tier 4 with 0 rank upgrades.</p>
+
+<%- await createRelicListTemplate(allRelics, allAffixData, { keys: ['icon', 'name', 'eRelicSize', 'devotionAffinity', 'intrinsicAffixes'], unique: true }) %>
+
+<h2>List of all non-unique relics</h2>
+<p>A list of all non-unique relics in the game.</p>
+
+<%- await createRelicListTemplate(allRelics, allAffixData, { keys: ['icon', 'name', 'eRelicSize'], nonUnique: true }) %>

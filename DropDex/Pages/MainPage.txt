@@ -1,0 +1,20 @@
+<h1>Welcome to the Hell Clock DropDex</h1>
+<p>This is a tool for the game <a href="https://store.steampowered.com/app/1782460/Hell_Clock/" target="_blank" rel="noopener noreferrer">Hell Clock</a> You can find information about relics, treasure classes, dungeons, and more.</p>
+<p>Use the navigation on the left to browse through the different sections of the wiki.</p>
+
+<div class="warning-box" style="background-color: #4a2121; border: 1px solid #a04040; padding: 15px; border-radius: 5px; margin-top: 20px;">
+    <h3 style="margin-top: 0; color: #ffdddd;">Disclaimer: Data Accuracy</h3>
+    <p style="color: #ffdddd;">The data on this wiki is sourced from the official <a href="https://github.com/RogueSnail/hellclock-data-export" target="_blank" rel="noopener noreferrer">Hell Clock Data Export</a> repository.</p>
+    <% if (typeof lastUpdateDate !== 'undefined') { %>
+        <p style="color: #ffdddd;">Last data repository update: <strong><%- lastUpdateDate %></strong></p>
+    <% } %>
+    <p style="color: #ffdddd;">This data may not be up-to-date if a new game patch has been released more recently than the last data export update.</p>
+    <p style="color: #ffdddd;">Please check the <a href="https://store.steampowered.com/news/app/1782460" target="_blank" rel="noopener noreferrer">Hell Clock Steam page</a> for the latest game update information to ensure you have the most current details.</p>
+</div>
+
+<h2>Quick Links</h2>
+<ul>
+    <li><a href="?page=relics/Uber Relics">Uber Relics</a></li>
+    <li><a href="?page=relics/Nightmare Relics">Nightmare Relics</a></li>
+    <li><a href="?page=relics/Community Relics">Community Relics</a></li>
+</ul>

@@ -1,0 +1,462 @@
+body {
+    font-family: sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.wiki-container {
+    display: flex;
+    max-width: 1400px;
+    margin: 20px auto;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.sidebar {
+    flex: 0 0 220px;
+    padding: 20px;
+    border-right: 1px solid #ddd;
+    background-color: #f9f9f9;
+    position: relative;
+}
+
+.sidebar h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 10px;
+}
+
+.sidebar nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar nav a {
+    text-decoration: none;
+    color: #0645ad;
+    display: block;
+    padding: 5px 0;
+}
+
+.sidebar nav a:hover {
+    text-decoration: underline;
+}
+
+.devotion-container {
+    margin: 15px 0;
+}
+
+.devotion-container h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
+
+.devotion-input {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.devotion-input input {
+    width: 60px;
+    padding: 4px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.search-container {
+    margin: 15px 0;
+    position: relative;
+}
+
+#searchInput {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#searchResults {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#searchResults a {
+    display: block;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.content {
+    flex: 1;
+    padding: 20px 40px;
+}
+
+a {
+    color: #0645ad;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+code {
+    background-color: #eee;
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+
+pre {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1em;
+    overflow-x: auto;
+    font-family: monospace, monospace;
+}
+
+pre code {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 10px;
+    margin-bottom: 1em;
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+.content-beside-infobox {
+    overflow: auto; /* Establish a new block formatting context to sit beside the float */
+    padding-right: 1em; /* Optional: space between content and infobox */
+}
+
+.wiki-button {
+    padding: 5px 10px;
+    cursor: pointer;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: sans-serif;
+}
+
+.wiki-button:hover {
+    background-color: #f0f0f0;
+}
+
+.source-view {
+    white-space: pre-wrap;
+    background-color: #f9f9f9;
+    padding: 1em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: monospace, monospace;
+}
+
+.source-view code {
+    background-color: transparent;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+}
+
+.content h2.wiki-heading {
+    font-size: 1.5em;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 8px;
+    margin-top: 2em;
+    margin-bottom: 1em;
+}
+
+.content h3.wiki-heading {
+    font-size: 1.2em;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 6px;
+    margin-top: 1.5em;
+    margin-bottom: 1em;
+}
+
+/* Infobox Template Styles (for relics, etc.) */
+.infobox {
+    border: 1px solid #a2a9b1;
+    background-color: #f8f9fa;
+    padding: 0;
+    margin: 1em 0 1em 1em;
+    float: right;
+    clear: right;
+    width: 300px;
+    font-size: 0.9em;
+}
+
+.infobox-header {
+    background-color: #e9e9e9;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px;
+    border-bottom: 1px solid #a2a9b1;
+}
+
+.infobox-content {
+    padding: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.infobox-image img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.infobox-footer {
+    background-color: #f0f0f0;
+    font-size: 0.8em;
+    text-align: center;
+    padding: 5px;
+    border-top: 1px solid #a2a9b1;
+    color: #555;
+}
+
+.treasure-class-infobox {
+    width: auto;
+}
+
+.error {
+    color: red;
+    font-weight: bold;
+}
+
+.infobox-affixes {
+    padding: 0 15px 15px 15px;
+    font-size: 0.9em;
+}
+
+.infobox-affixes h4 {
+    margin: 15px 0 5px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #ddd;
+    font-size: 1.1em;
+}
+
+.infobox-affixes ul {
+    margin: 5px 0 0 0;
+    padding-left: 20px;
+}
+
+/* Relic List Table */
+.relic-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.relic-list-table th,
+.relic-list-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.relic-list-table th {
+    background-color: #e9e9e9;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+}
+
+.relic-list-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.relic-list-table tr:hover {
+    background-color: #f0f0f0;
+}
+
+.relic-list-icon-cell {
+    width: 80px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.relic-list-icon-cell img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .wiki-container {
+        background-color: #161b22;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    .sidebar {
+        border-right: 1px solid #30363d;
+        background-color: #161b22;
+    }
+
+    .sidebar h2 {
+        border-bottom: 1px solid #30363d;
+    }
+
+    .devotion-container h4 {
+        border-bottom-color: #30363d;
+    }
+
+    .devotion-input input {
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+    }
+
+    .sidebar nav a, a {
+        color: #58a6ff;
+    }
+
+    #searchInput {
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+    }
+
+    #searchResults {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-top: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    #searchResults a {
+        border-bottom: 1px solid #30363d;
+        color: #c9d1d9;
+    }
+    
+    .wiki-button {
+        background-color: #21262d;
+        border-color: #30363d;
+        color: #c9d1d9;
+    }
+
+    .wiki-button:hover {
+        background-color: #30363d;
+    }
+
+    #searchResults a:hover {
+        background-color: #21262d;
+    }
+
+    h1 {
+        border-bottom: 1px solid #30363d;
+    }
+
+    code {
+        background-color: #21262d;
+        border: 1px solid #30363d;
+    }
+
+    pre {
+        background-color: #161b22;
+        border-color: #30363d;
+        color: #c9d1d9;
+    }
+
+    .source-view {
+        background-color: #161b22;
+        border-color: #30363d;
+        color: #c9d1d9;
+    }
+
+    .content h2.wiki-heading {
+        border-bottom-color: #30363d;
+    }
+
+    .content h3.wiki-heading {
+        border-bottom-color: #282d33;
+    }
+
+    .infobox {
+        border: 1px solid #30363d;
+        background-color: #21262d;
+    }
+
+    .infobox-header {
+        background-color: #30363d;
+        border-bottom: 1px solid #484f58;
+    }
+
+    .infobox-footer {
+        background-color: #161b22;
+        border-top: 1px solid #30363d;
+        color: #8b949e;
+    }
+
+    .error {
+        color: #f85149;
+    }
+
+    .infobox-affixes h4 {
+        border-bottom: 1px solid #30363d;
+    }
+
+    .relic-list-table th,
+    .relic-list-table td {
+        border: 1px solid #30363d;
+    }
+
+    .relic-list-table th {
+        background-color: #21262d;
+    }
+
+    .relic-list-table tr:nth-child(even) {
+        background-color: #161b22;
+    }
+
+    .relic-list-table tr:hover {
+        background-color: #21262d;
+    }
+}
+
+.search-suggestion {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+

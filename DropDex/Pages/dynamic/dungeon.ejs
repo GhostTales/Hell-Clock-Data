@@ -1,0 +1,7 @@
+<% const safeTitle = itemTitle.replace(/'/g, "\\'"); %>
+<% const dungeon = allDungeons.find(d => d.name.toLowerCase() === safeTitle.toLowerCase()); %>
+<% if (dungeon) { %>
+    <%- await createDungeonTemplate(dungeon) %>
+<% } else { %>
+    <p>Dungeon not found: <%= itemTitle %></p>
+<% } %>

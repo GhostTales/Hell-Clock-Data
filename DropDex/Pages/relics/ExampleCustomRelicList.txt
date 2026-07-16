@@ -1,0 +1,20 @@
+<p>This page demonstrates how to create a curated list of relics by passing an array of specific relic IDs to the <code>createRelicListTemplate</code> function.</p>
+<p>This is useful for creating specialized build guides or highlighting specific items of interest.</p>
+
+<h3>Example List</h3>
+<p>The following list displays only the relics with IDs 11, 12, 23, and 25.</p>
+
+<%- await createRelicListTemplate(allRelics, allAffixData, { 
+    keys: ['icon', 'name', 'eRelicSize', 'intrinsicAffixes'], 
+    ids: [11, 12, 23, 25] 
+}) %>
+
+<hr>
+<h2>Page Source</h2>
+<p>This is achieved using the <code>ids</code> option in the template call, as shown below:</p>
+
+<pre><code>&lt;%- await createRelicListTemplate(allRelics, allAffixData, { 
+    keys: ['icon', 'name', 'eRelicSize', 'intrinsicAffixes'], 
+    ids: [11, 12, 23, 25] 
+}) %&gt;
+</code></pre>

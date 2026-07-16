@@ -1,0 +1,4 @@
+<h2>Treasure Classes</h2>
+A list of all Treasure Classes in the game.
+
+<%- await createTreasureClassListTemplate(allTCs, ['id', 'name', 'type']) %>

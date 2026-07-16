@@ -1,0 +1,1 @@
+<%- await createRelicListTemplate(allRelics, allAffixData, { keys: ['icon', 'name', 'eRelicSize', 'devotionAffinity', 'intrinsicAffixes'], uber: true }) %>
