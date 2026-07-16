@@ -61,7 +61,9 @@ async function loadPage(pageName) {
                         month: 'long',
                         day: 'numeric',
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        timeZone: 'UTC',
+                        timeZoneName: 'short'
                     });
                 } else {
                     extraContextForParser.lastUpdateDate = "Could not be determined.";
