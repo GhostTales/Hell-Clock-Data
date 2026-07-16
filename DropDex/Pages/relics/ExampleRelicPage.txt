@@ -5,19 +5,18 @@
     
     <p>This is an example of a custom page for a specific relic (ID 11). It uses EJS to find the relic and then calls several template functions to display its information.</p>
 
+    <h2>Page Source</h2>
+    <p>Here is the EJS source code used to generate this page's content. Note that the descriptive paragraph and this source view are also part of the page's source, but are omitted here for clarity.</p>
+    <pre><code>&lt;% const relic = allRelics.find(r => r.id === 11); %&gt;
+    &lt;% if (relic) { %&gt;
+        &lt;%- await createRelicTemplate(relic, allAffixData, allSkills) %&gt;
+        &lt;%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics) %&gt;
+        &lt;%- await createRelicInTreasureTemplate(relic, allTCs, allRelics) %&gt;
+    &lt;% } %&gt;</code></pre>
+
     <%# The rest of the content tables are rendered below the main description. %>
     <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics) %>
     <%- await createRelicInTreasureTemplate(relic, allTCs, allRelics) %>
 <% } else { %>
     <p>Relic with ID 11 not found.</p>
 <% } %>
-
-<hr>
-<h2>Page Source</h2>
-<p>Here is the EJS source code used to generate this page's content. Note that the descriptive paragraph and this source view are also part of the page's source, but are omitted here for clarity.</p>
-<pre><code>&lt;% const relic = allRelics.find(r => r.id === 11); %&gt;
-&lt;% if (relic) { %&gt;
-    &lt;%- await createRelicTemplate(relic, allAffixData, allSkills) %&gt;
-    &lt;%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics) %&gt;
-    &lt;%- await createRelicInTreasureTemplate(relic, allTCs, allRelics) %&gt;
-&lt;% } %&gt;</code></pre>
