@@ -106,7 +106,6 @@ async function loadPage(pageName, options = {}) {
             extraContextForParser.lastUpdateDate = "Could not be determined (network error).";
         }
     }
-    const dynamicItemTypes = ['relics', 'treasure_classes', 'dungeons'];
 
     try {
         if (pageName === 'Search') {
@@ -186,15 +185,22 @@ async function loadPage(pageName, options = {}) {
             return;
         }
 
-        const pathParts = pageName.split('/');
-        const isDynamic = dynamicItemTypes.includes(pathParts[0]) && pathParts.length > 1;
+        // Try to load a static .txt page first. This allows overriding dynamic pages.
+        const staticResponse = await fetch(`Pages/${pageName}.txt`);
+        if (staticResponse.ok) {
+            textContent = await staticResponse.text();
+            pageTitle = pageName.replace(/_/g, ' ').split('/').pop();
+        } else {
+            // If no static page, try dynamic generation for item pages like /relics/<name>
+            const pathParts = pageName.split('/');
+            if (pathParts.length < 2) {
+                throw new Error(`Page not found: ${pageName}`);
+            }
 
-        if (isDynamic) {
-            // Handle dynamic pages (relics, treasure classes, etc.)
             const itemType = pathParts[0];
             const encodedItemName = pathParts.slice(1).join('/');
             const itemTitle = decodeURIComponent(encodedItemName);
-            pageTitle = itemTitle;
+            pageTitle = itemTitle; // Update page title to just be the item name
             extraContextForParser = { itemTitle };
 
             let dynamicTemplatePath;
@@ -204,17 +210,17 @@ async function loadPage(pageName, options = {}) {
                 dynamicTemplatePath = 'Pages/dynamic/treasure_class.ejs';
             } else if (itemType === 'dungeons') {
                 dynamicTemplatePath = 'Pages/dynamic/dungeon.ejs';
-            } // No else needed due to 'isDynamic' check
+            }
 
-            const templateResponse = await fetch(dynamicTemplatePath);
-            if (!templateResponse.ok) throw new Error(`Dynamic template not found: ${dynamicTemplatePath}`);
-            textContent = await templateResponse.text();
-        } else {
-            // Handle static pages
-            const staticResponse = await fetch(`Pages/${pageName}.txt`);
-            if (!staticResponse.ok) throw new Error(`Page not found: ${pageName}`);
-            textContent = await staticResponse.text();
-            pageTitle = pageName.replace(/_/g, ' ').split('/').pop();
+            if (dynamicTemplatePath) {
+                const templateResponse = await fetch(dynamicTemplatePath);
+                if (!templateResponse.ok) {
+                    throw new Error(`Dynamic template not found: ${dynamicTemplatePath}`);
+                }
+                textContent = await templateResponse.text();
+            } else {
+                throw new Error(`Page or item type not found: ${pageName}`);
+            }
         }
 
         const parsedHtml = await parseContent(textContent, extraContextForParser);
