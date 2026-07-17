@@ -38,13 +38,43 @@ function getLevenshteinDistance(a, b) {
 }
 
 /**
+ * Debounce function to limit how often a function can be called.
+ * @param {Function} func The function to debounce.
+ * @param {number} delay The delay in milliseconds.
+ * @returns {Function} The new debounced function.
+ */
+function debounce(func, delay) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, delay);
+    };
+}
+
+/**
  * Loads a DropDex page, parses it, and injects it into the main content area.
  * @param {string} pageName - The name of the page to load (e.g., 'Main_Page').
+ * @param {object} [options={}] - Optional parameters.
+ * @param {boolean} [options.isDevotionUpdate=false] - Flag for a less disruptive reload.
  */
-async function loadPage(pageName) {
+async function loadPage(pageName, options = {}) {
     const mainContent = document.getElementById('mainContent');
     let pageTitle = pageName.replace(/_/g, ' ');
-    mainContent.innerHTML = `<h1>Loading ${pageTitle}...</h1>`;
+
+    // For devotion updates, show a subtle loading state and don't clear the header
+    if (options.isDevotionUpdate) {
+        const pageContent = document.getElementById('pageContent');
+        if (pageContent) {
+            pageContent.style.opacity = '0.5';
+        }
+    } else {
+        // For full page loads, show the loading message
+        mainContent.innerHTML = `<h1>Loading ${pageTitle}...</h1>`;
+    }
 
     let textContent;
     let extraContextForParser = {};
@@ -194,27 +224,35 @@ async function loadPage(pageName) {
         }
 
         const parsedHtml = await parseContent(textContent, extraContextForParser);
-        
-        // Create a title and inject content
-        mainContent.innerHTML = `
-            <div class="page-header">
-                <h1>${pageTitle}</h1>
-                <button id="viewSourceBtn" class="tool-button">View Source</button>
-            </div>
-            <div id="pageContent">${parsedHtml}</div>`;
 
-        document.getElementById('viewSourceBtn').addEventListener('click', () => {
-            const pageContent = document.getElementById('pageContent');
-            const btn = document.getElementById('viewSourceBtn');
-            if (btn.textContent === 'View Source') {
-                pageContent.innerHTML = `<pre class="source-view"><code></code></pre>`;
-                pageContent.querySelector('code').textContent = textContent;
-                btn.textContent = 'View Page';
-            } else {
-                pageContent.innerHTML = parsedHtml;
-                btn.textContent = 'View Source';
-            }
-        });
+        // Intelligently update the DOM to prevent flashing on devotion changes
+        const pageContentEl = document.getElementById('pageContent');
+        if (options.isDevotionUpdate && pageContentEl) {
+            // Soft update: only replace the content div
+            pageContentEl.innerHTML = parsedHtml;
+            pageContentEl.style.opacity = '1';
+        } else {
+            // Hard update: replace the whole main content area
+            mainContent.innerHTML = `
+                <div class="page-header">
+                    <h1>${pageTitle}</h1>
+                    <button id="viewSourceBtn" class="tool-button">View Source</button>
+                </div>
+                <div id="pageContent">${parsedHtml}</div>`;
+
+            document.getElementById('viewSourceBtn').addEventListener('click', () => {
+                const pageContent = document.getElementById('pageContent');
+                const btn = document.getElementById('viewSourceBtn');
+                if (btn.textContent === 'View Source') {
+                    pageContent.innerHTML = `<pre class="source-view"><code></code></pre>`;
+                    pageContent.querySelector('code').textContent = textContent;
+                    btn.textContent = 'View Page';
+                } else {
+                    pageContent.innerHTML = parsedHtml;
+                    btn.textContent = 'View Source';
+                }
+            });
+        }
 
     } catch (error) {
         console.error('Failed to load page:', error);
@@ -232,24 +270,26 @@ async function loadPage(pageName) {
 function initialize() {
     const devotionInputs = ['furyPoints', 'faithPoints', 'disciplinePoints'];
 
+    // Create a debounced version of the page loader for devotion updates
+    const debouncedLoadPageForDevotion = debounce(() => {
+        const currentUrlParams = new URLSearchParams(window.location.search);
+        const currentPageName = currentUrlParams.get('page') || 'Main_Page';
+        // Call loadPage with a flag to indicate a soft-reload
+        loadPage(currentPageName, { isDevotionUpdate: true });
+    }, 400); // 400ms delay
+
     // Set up devotion inputs to persist across page loads
     devotionInputs.forEach(id => {
         const input = document.getElementById(id);
         if (input) {
             // On page load, restore the value from sessionStorage
             const savedValue = sessionStorage.getItem(id);
-            if (savedValue !== null) {
-                input.value = savedValue;
-            }
+            if (savedValue !== null) input.value = savedValue;
 
-            // When the input changes, save the new value and reload the page content
-            input.addEventListener('change', (event) => {
+            // When the input changes (typing or arrows), save the new value and trigger a debounced reload
+            input.addEventListener('input', (event) => {
                 sessionStorage.setItem(id, event.target.value);
-
-                // Get the current page from the URL to reload its content
-                const currentUrlParams = new URLSearchParams(window.location.search);
-                const currentPageName = currentUrlParams.get('page') || 'Main_Page';
-                loadPage(currentPageName);
+                debouncedLoadPageForDevotion();
             });
         }
     });

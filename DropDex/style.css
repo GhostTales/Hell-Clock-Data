@@ -99,6 +99,11 @@ body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
+#pageContent {
+    /* For smooth transitions during soft reloads */
+    transition: opacity 150ms ease-in-out;
+}
+
 #searchResults a {
     display: block;
     padding: 8px 12px;
@@ -459,4 +464,3 @@ pre code {
     border-radius: 6px;
     font-size: 0.9em;
 }
-
