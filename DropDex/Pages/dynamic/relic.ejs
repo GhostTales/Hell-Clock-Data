@@ -1,9 +1,34 @@
 <% const safeTitle = itemTitle; %>
 <% const relic = allRelics.find(r => (getEnLoc(r.nameLocalizationKey) || r.name).toLowerCase() === safeTitle.toLowerCase()); %>
 <% if (relic) { %>
-    <%- await createRelicTemplate(relic, allAffixData, allSkills) %>
-    <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics) %>
-    <%- await createRelicInTreasureTemplate(relic, allTCs, allRelics) %>
+    <%- await createRelicTemplate(relic, allAffixData, allSkills) %>    
+    <div class="devotion-section">
+        <div class="devotion-container">
+            <h4>Devotion Points</h4>
+            <p>Set your devotion points to match in game values.</p>
+            <div class="devotion-input">
+                <label for="furyPoints">Fury</label>
+                <input type="number" id="furyPoints" value="0" min="0">
+            </div>
+            <div class="devotion-input">
+                <label for="disciplinePoints">Discipline</label>
+                <input type="number" id="disciplinePoints" value="0" min="0">
+            </div>
+            <div class="devotion-input">
+                <label for="faithPoints">Faith</label>
+                <input type="number" id="faithPoints" value="0" min="0">
+            </div>
+        </div>
+        <div class="devotion-explainer">
+            <h4 class="accordion-toggle" onclick="toggleAccordion('devotion-details', this)" data-alternate-text="How does devotion work? &#9652;">How does devotion work? &#9662;</h4>
+            <div id="devotion-details" class="collapsible-content" style="display: none;">
+                <p>Having a high amount in a single devotion (Fury, Faith, or Discipline) can increase the drop chance of relics that share that affinity. If there is a single highest devotion (no ties) and the point value is greater than 4, a bonus is applied. The "Your Chance" column in the tables below will update to reflect this bonus.</p>
+            </div>
+        </div>
+    </div>
+    <div class="relic-page-main-content">
+        <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %>
+    </div>    
 <% } else { %>
     <p>Relic not found: <%= itemTitle %></p>
 <% } %>

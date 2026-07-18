@@ -79,6 +79,14 @@ async function loadPage(pageName, options = {}) {
     let textContent;
     let extraContextForParser = {};
 
+    // Get devotion points from sessionStorage and add to context for the parser
+    const devotionInputs = ['furyPoints', 'faithPoints', 'disciplinePoints'];
+    const devotionPoints = {};
+    devotionInputs.forEach(id => {
+        devotionPoints[id] = parseInt(sessionStorage.getItem(id), 10) || 0;
+    });
+    extraContextForParser.devotionPoints = devotionPoints;
+
     if (pageName === 'MainPage') {
         try {
             const response = await fetch('https://api.github.com/repos/RogueSnail/hellclock-data-export/commits?per_page=1');
@@ -201,7 +209,7 @@ async function loadPage(pageName, options = {}) {
             const encodedItemName = pathParts.slice(1).join('/');
             const itemTitle = decodeURIComponent(encodedItemName);
             pageTitle = itemTitle; // Update page title to just be the item name
-            extraContextForParser = { itemTitle };
+            extraContextForParser.itemTitle = itemTitle;
 
             let dynamicTemplatePath;
             if (itemType === 'relics') {
@@ -253,7 +261,9 @@ async function loadPage(pageName, options = {}) {
                 }
             });
         }
-
+        
+        // After updating the DOM, set up listeners for any devotion inputs on the page.
+        setupDevotionListeners();
     } catch (error) {
         console.error('Failed to load page:', error);
         mainContent.innerHTML = `
@@ -265,40 +275,58 @@ async function loadPage(pageName, options = {}) {
 }
 
 /**
- * Initializes the DropDex router and loads the correct page.
+ * Finds devotion inputs on the current page and attaches event listeners for persistence and auto-reloading.
  */
-function initialize() {
+function setupDevotionListeners() {
     const devotionInputs = ['furyPoints', 'faithPoints', 'disciplinePoints'];
 
     // Create a debounced version of the page loader for devotion updates
     const debouncedLoadPageForDevotion = debounce(() => {
         const currentUrlParams = new URLSearchParams(window.location.search);
         const currentPageName = currentUrlParams.get('page') || 'Main_Page';
-        // Call loadPage with a flag to indicate a soft-reload
         loadPage(currentPageName, { isDevotionUpdate: true });
     }, 400); // 400ms delay
 
-    // Set up devotion inputs to persist across page loads
     devotionInputs.forEach(id => {
         const input = document.getElementById(id);
         if (input) {
-            // On page load, restore the value from sessionStorage
             const savedValue = sessionStorage.getItem(id);
             if (savedValue !== null) input.value = savedValue;
 
-            // When the input changes (typing or arrows), save the new value and trigger a debounced reload
             input.addEventListener('input', (event) => {
                 sessionStorage.setItem(id, event.target.value);
                 debouncedLoadPageForDevotion();
             });
         }
     });
+}
 
-    // Now that inputs are restored, load the page content and search
+/**
+ * Initializes the DropDex router and loads the correct page.
+ */
+function initialize() {
     const urlParams = new URLSearchParams(window.location.search);
     const pageName = urlParams.get('page') || 'Main_Page'; // Default to Main_Page
     loadPage(pageName);
     initializeSearch();
+}
+
+/**
+ * Toggles the visibility of a collapsible element.
+ * @param {string} elementId - The ID of the element to toggle.
+ * @param {HTMLElement} button - The button element that was clicked.
+ */
+window.toggleAccordion = function(elementId, button) {
+    const content = document.getElementById(elementId);
+    if (content) {
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? '' : 'none';
+
+        const currentText = button.innerHTML;
+        const alternateText = button.dataset.alternateText;
+        button.innerHTML = alternateText;
+        button.dataset.alternateText = currentText;
+    }
 }
 
 // Run the initializer when the DOM is ready

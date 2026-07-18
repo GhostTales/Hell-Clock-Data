@@ -2,6 +2,23 @@ import { getGameData } from '../data.js';
 import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap } from './utils.js';
 
 /**
+ * Creates an HTML table row for a dungeon.
+ * @param {object} row - The dungeon row data.
+ * @returns {string} HTML string for the table row.
+ */
+function createRowHtml(row) {
+    const encodedDungeonName = encodeURIComponent(row.dungeonInternalName);
+    const dungeonLink = `<a href="?page=dungeons/${encodedDungeonName}">${row.dungeonName}</a>`;
+    return `<tr>
+        <td>${dungeonLink}</td>
+        <td>${row.maxTier}</td>
+        <td>${row.maxTier !== 'N/A' ? row.maxTierChance.toFixed(2) + '%' : 'N/A'}</td>
+        <td>${row.baseChance.toFixed(2)}%</td>
+        <td>${row.yourChance.toFixed(2)}%</td>
+    </tr>`;
+}
+
+/**
  * Creates an HTML list of Dungeons that contain a specific relic, including combined drop chances based on devotion points.
  * @param {object} relic - The relic data object.
  * @param {Array<object>} allDungeons - All dungeon data.
@@ -9,14 +26,14 @@ import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap } from './
  * @param {Array<object>} allRelics - All relic data (needed for devotion calculations).
  * @returns {Promise<string>} HTML string for the list.
  */
-export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasureClasses, allRelics) {
+export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasureClasses, allRelics, devotionPoints = {}) {
     if (!relic) {
         return '<span class="error">[Relic not found]</span>';
     }
 
-    const furyPoints = parseInt(document.getElementById('furyPoints')?.value, 10) || 0;
-    const faithPoints = parseInt(document.getElementById('faithPoints')?.value, 10) || 0;
-    const disciplinePoints = parseInt(document.getElementById('disciplinePoints')?.value, 10) || 0;
+    const furyPoints = devotionPoints.furyPoints || 0;
+    const faithPoints = devotionPoints.faithPoints || 0;
+    const disciplinePoints = devotionPoints.disciplinePoints || 0;
 
     const devotions = {
         "Fury": furyPoints,
@@ -42,7 +59,12 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
         devotionBonus = 2 + 0.1 * amount_points;
     }
 
-    const dungeonRowsData = [];
+    const campaignNormalRows = [];
+    const campaignOtherRows = [];
+    const endlessDungeonRows = [];
+    const ascensionDungeonRows = [];
+    const campaignRegex = /^Act\d{2}_DungeonConfig$/;
+
 
     for (const dungeon of allDungeons) {
         let combinedBaseChance = 0;
@@ -101,51 +123,91 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
         }
 
         if (combinedBaseChance > 0) {
-            dungeonRowsData.push({
+            const rowData = {
+                dungeonId: dungeon.id,
                 dungeonName: DungeonConfigNameShorthandMap[dungeon.name] || dungeon.name,
                 maxTier: dungeonMaxTier,
                 dungeonInternalName: dungeon.name,
                 maxTierChance: dungeonMaxTierChance,
                 baseChance: combinedBaseChance,
                 yourChance: combinedYourChance
-            });
+            };
+
+            if (dungeon.name.startsWith('Nightmare')) {
+                endlessDungeonRows.push(rowData);
+            } else if (dungeon.name.includes('_Endgame_')) {
+                ascensionDungeonRows.push(rowData);
+            } else if (campaignRegex.test(dungeon.name)) {
+                campaignNormalRows.push(rowData);
+            } else if (dungeon.name.startsWith('Act')) {
+                campaignOtherRows.push(rowData);
+            }
         }
     }
 
-    if (dungeonRowsData.length === 0) {
+    if (campaignNormalRows.length === 0 && campaignOtherRows.length === 0 && endlessDungeonRows.length === 0 && ascensionDungeonRows.length === 0) {
         return `<p>This relic is not found in any dungeon's treasure classes.</p>`;
     }
 
-    dungeonRowsData.sort((a, b) => {
-        const tierA = a.maxTier === 'N/A' ? -1 : a.maxTier;
-        const tierB = b.maxTier === 'N/A' ? -1 : b.maxTier;
+    let html = '';
 
-        if (tierB !== tierA) {
-            return tierB - tierA; // Sort by max tier descending
+    // Campaign (Normal) Table
+    html += '<h3 class="tool-heading">Campaign</h3>';
+    if (campaignNormalRows.length > 0) {
+        html += '<table class="relic-list-table"><thead><tr><th>Dungeon</th><th>Max Tier</th><th>Max Tier Chance</th><th>Base Chance</th><th>Your Chance</th></tr></thead>';
+        campaignNormalRows.sort((a, b) => a.dungeonId - b.dungeonId);
+        html += '<tbody>';
+        for (const row of campaignNormalRows) {
+            html += createRowHtml(row);
         }
-
-        if (b.yourChance !== a.yourChance) {
-            return b.yourChance - a.yourChance; // Then by your chance descending
+        html += '</table>';
+    } else {
+        if (campaignOtherRows.length === 0) {
+            html += '<p>This relic does not drop from any Campaign dungeons.</p>';
+        } else {
+            html += '<p>This relic does not drop from normal Campaign difficulties.</p>';
         }
-
-        return b.maxTierChance - a.maxTierChance; // Finally by max tier chance descending
-    });
-
-    let html = '<table class="relic-list-table"><thead><tr><th>Dungeon</th><th>Max Tier</th><th>Max Tier Chance</th><th>Base Chance</th><th>Your Chance</th></tr></thead><tbody>';
-
-    for (const row of dungeonRowsData) {
-        const encodedDungeonName = encodeURIComponent(row.dungeonInternalName);
-        const dungeonLink = `<a href="?page=dungeons/${encodedDungeonName}">${row.dungeonName}</a>`;
-        html += `<tr>
-            <td>${dungeonLink}</td>
-            <td>${row.maxTier}</td>
-            <td>${row.maxTier !== 'N/A' ? row.maxTierChance.toFixed(2) + '%' : 'N/A'}</td>
-            <td>${row.baseChance.toFixed(2)}%</td>
-            <td>${row.yourChance.toFixed(2)}%</td>
-        </tr>`;
     }
 
-    html += '</tbody></table>';
+    // Endless Nightmares Table
+    if (endlessDungeonRows.length > 0) {
+        html += '<h3 class="tool-heading">Endless Nightmares</h3>';
+        endlessDungeonRows.sort((a, b) => {
+            const tierA = parseInt(a.dungeonName.substring(1));
+            const tierB = parseInt(b.dungeonName.substring(1));
+            return tierA - tierB;
+        });
+        html += '<table class="relic-list-table"><thead><tr><th>Dungeon</th><th>Max Tier</th><th>Max Tier Chance</th><th>Base Chance</th><th>Your Chance</th></tr></thead><tbody>';
+        for (const row of endlessDungeonRows) {
+            html += createRowHtml(row);
+        }
+        html += '</tbody></table>';
+    }
+    
+    // Ascension Table
+    if (ascensionDungeonRows.length > 0) {
+        html += '<h3 class="tool-heading">Ascension</h3>';
+        ascensionDungeonRows.sort((a, b) => a.dungeonId - b.dungeonId);
+        html += '<table class="relic-list-table"><thead><tr><th>Dungeon</th><th>Max Tier</th><th>Max Tier Chance</th><th>Base Chance</th><th>Your Chance</th></tr></thead><tbody>';
+        for (const row of ascensionDungeonRows) {
+            html += createRowHtml(row);
+        }
+        html += '</tbody></table>';
+    }
+
+    // Other Campaign Dungeons
+    if (campaignOtherRows.length > 0) {
+        html += '<h3 class="tool-heading">Other Campaign Dungeons</h3>';
+        html += '<table class="relic-list-table"><thead><tr><th>Dungeon</th><th>Max Tier</th><th>Max Tier Chance</th><th>Base Chance</th><th>Your Chance</th></tr></thead>';
+        html += '<tbody class="collapsible-content" id="campaign-other-dungeons" style="display: none;">';
+        campaignOtherRows.sort((a, b) => a.dungeonId - b.dungeonId);
+        for (const row of campaignOtherRows) {
+            html += createRowHtml(row);
+        }
+        html += '</tbody>';
+        html += '<tfoot><tr><td colspan="5" class="accordion-toggle" onclick="toggleAccordion(\'campaign-other-dungeons\', this)" data-alternate-text="Show Less Campaign Dungeons &#9652;">Show Other Campaign Dungeons &#9662;</td></tr></tfoot>';
+        html += '</table>';
+    }
     
     if (highestDevotionType) {
         html += `<p style="font-size: 0.9em;"><i>Your highest devotion is ${highestDevotionType}, applying a ${devotionBonus.toFixed(2)}x weight multiplier.</i></p>`;

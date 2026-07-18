@@ -82,7 +82,7 @@ export async function createRelicTemplate(relic, allAffixData, allSkillsData) {
     }
 
     return `
-        <div class="infobox relic-infobox" style="float: right; margin: 0 0 1em 1em; width: 300px;">
+        <div class="infobox relic-infobox">
             <div class="infobox-header">${name}</div>
             ${iconContainerHtml}
             <div class="infobox-content" style="padding: 0 5px;">
