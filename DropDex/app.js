@@ -236,9 +236,26 @@ async function loadPage(pageName, options = {}) {
         // Intelligently update the DOM to prevent flashing on devotion changes
         const pageContentEl = document.getElementById('pageContent');
         if (options.isDevotionUpdate && pageContentEl) {
+            const activeElement = document.activeElement;
+            const activeElementId = activeElement ? activeElement.id : null;
+            let selectionStart, selectionEnd;
+            if (activeElement && activeElement.selectionStart !== null) {
+                selectionStart = activeElement.selectionStart;
+                selectionEnd = activeElement.selectionEnd;
+            }
             // Soft update: only replace the content div
             pageContentEl.innerHTML = parsedHtml;
             pageContentEl.style.opacity = '1';
+
+            if (activeElementId) {
+                const newActiveElement = document.getElementById(activeElementId);
+                if (newActiveElement) {
+                    newActiveElement.focus();
+                    if (selectionStart !== undefined && newActiveElement.setSelectionRange) {
+                        newActiveElement.setSelectionRange(selectionStart, selectionEnd);
+                    }
+                }
+            }
         } else {
             // Hard update: replace the whole main content area
             mainContent.innerHTML = `
