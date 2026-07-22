@@ -77,8 +77,9 @@ export async function buildSearchIndex() {
 
 /**
  * Initializes the search functionality.
+ * @param {function(string): void} navigate The function to handle SPA navigation.
  */
-export function initializeSearch() {
+export function initializeSearch(navigate) {
     const searchInput = document.getElementById('searchInput');
     const searchResults = document.getElementById('searchResults');
     if (!searchInput || !searchResults) return;
@@ -88,10 +89,10 @@ export function initializeSearch() {
 
     searchInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
+            event.preventDefault();
             const query = searchInput.value.trim();
             if (query) {
-                // Redirect to a dedicated search results page
-                window.location.href = `?page=Search&query=${encodeURIComponent(query)}`;
+                navigate(`?page=Search&query=${encodeURIComponent(query)}`);
             }
         }
     });

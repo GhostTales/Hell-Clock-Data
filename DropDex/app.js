@@ -319,13 +319,47 @@ function setupDevotionListeners() {
 }
 
 /**
+ * Navigates to a new page, updating history and loading content.
+ * @param {string} href - The destination URL (e.g., '?page=Search&query=item').
+ */
+function navigate(href) {
+    // Prevent re-loading the same page.
+    if (href === window.location.search) {
+        return;
+    }
+    const urlParams = new URLSearchParams(href);
+    const pageName = urlParams.get('page');
+
+    if (pageName) {
+        history.pushState({ page: pageName }, '', href);
+        loadPage(pageName);
+    }
+}
+
+/**
  * Initializes the DropDex router and loads the correct page.
  */
 function initialize() {
     const urlParams = new URLSearchParams(window.location.search);
     const pageName = urlParams.get('page') || 'Main_Page'; // Default to Main_Page
     loadPage(pageName);
-    initializeSearch();
+    initializeSearch(navigate);
+
+    // Handle back/forward browser buttons
+    window.addEventListener('popstate', () => {
+        const popUrlParams = new URLSearchParams(window.location.search);
+        const pageName = popUrlParams.get('page') || 'Main_Page';
+        loadPage(pageName);
+    });
+
+    // Intercept clicks on internal links to enable SPA-style navigation
+    document.addEventListener('click', (event) => {
+        const anchor = event.target.closest('a');
+        if (anchor && anchor.getAttribute('href')?.startsWith('?page=') && anchor.target !== '_blank' && !event.ctrlKey && !event.metaKey) {
+            event.preventDefault();
+            navigate(anchor.getAttribute('href'));
+        }
+    });
 }
 
 /**
