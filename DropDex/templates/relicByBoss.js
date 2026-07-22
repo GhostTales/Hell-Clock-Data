@@ -221,7 +221,6 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
     const disciplinePoints = devotionPoints.disciplinePoints || 0;
 
     const devotions = { "Fury": furyPoints, "Faith": faithPoints, "Discipline": disciplinePoints };
-    const devotionColorMap = { "Fury": "red", "Faith": "blue", "Discipline": "green" };
     const maxDevotion = Math.max(...Object.values(devotions));
     const highestDevotions = Object.keys(devotions).filter(key => devotions[key] === maxDevotion);
     
