@@ -1,5 +1,5 @@
 import { getGameData } from '../data.js';
-import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap } from './utils.js';
+import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap } from './utils.js';
 
 /**
  * Creates an HTML table row for a dungeon.
@@ -39,12 +39,6 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
         "Fury": furyPoints,
         "Faith": faithPoints,
         "Discipline": disciplinePoints
-    };
-
-    const devotionColorMap = {
-        "Fury": "red",
-        "Faith": "blue",
-        "Discipline": "green"
     };
 
     const maxDevotion = Math.max(...Object.values(devotions));

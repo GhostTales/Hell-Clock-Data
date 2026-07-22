@@ -27,7 +27,8 @@
         </div>
     </div>
     <div class="relic-page-main-content">
-        <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %>
+        <%- await createRelicByBossTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %>
+<!--         <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %>  -->   
     </div>    
 <% } else { %>
     <p>Relic not found: <%= itemTitle %></p>

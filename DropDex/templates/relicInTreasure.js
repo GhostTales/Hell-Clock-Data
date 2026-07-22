@@ -1,5 +1,5 @@
 import { getGameData } from '../data.js';
-import { calculateModifiedRelicWeights } from './utils.js';
+import { calculateModifiedRelicWeights, devotionColorMap } from './utils.js';
 
 /**
  * Creates an HTML list of Treasure Classes that can drop a specific relic, including drop chances based on devotion points.
@@ -21,12 +21,6 @@ export async function createRelicInTreasureTemplate(relic, allTreasureClasses, a
         "Fury": furyPoints,
         "Faith": faithPoints,
         "Discipline": disciplinePoints
-    };
-
-    const devotionColorMap = {
-        "Fury": "red",
-        "Faith": "blue",
-        "Discipline": "green"
     };
 
     const maxDevotion = Math.max(...Object.values(devotions));

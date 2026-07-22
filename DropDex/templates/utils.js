@@ -87,6 +87,11 @@ export const getEnLoc = (locKey) => {
 };
 
 export function calculateModifiedRelicWeights(availableRelics, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus) {
+    // Create a reverse map for looking up color by devotion name, used for the affinity bonus.
+    const nameToColorMap = Object.fromEntries(
+        Object.entries(devotionColorMap).map(([color, name]) => [name, color])
+    );
+
     return availableRelics.map(r => {
         const fullRelicData = allRelics.find(fullRelic => fullRelic.id === r.value.id);
         let currentRelicWeight = r.weight;
@@ -95,11 +100,11 @@ export function calculateModifiedRelicWeights(availableRelics, allRelics, devoti
         if (fullRelicData && fullRelicData.availabilityConditions && fullRelicData.availabilityConditions.conditionsConfigList) {
             for (const cond of fullRelicData.availabilityConditions.conditionsConfigList) {
                 if (cond.condition.includes("Devotion Condition")) {
-                    const requiredDevotionColor = cond.required_devotion.toLowerCase();
+                    const requiredDevotionName = devotionColorMap[cond.required_devotion.toLowerCase()];
                     const requiredValue = parseInt(cond.targetValue, 10);
-                    const devotionTypeKey = Object.keys(devotionColorMap).find(key => devotionColorMap[key] === requiredDevotionColor);
                     
-                    if (devotionTypeKey && devotions[devotionTypeKey] < requiredValue) {
+                    // If the user's devotion points for the required type are less than the required value, the relic cannot drop.
+                    if (requiredDevotionName && devotions[requiredDevotionName] < requiredValue) {
                         meetsConditions = false;
                         break;
                     }
@@ -112,7 +117,7 @@ export function calculateModifiedRelicWeights(availableRelics, allRelics, devoti
         }
 
         if (currentRelicWeight > 0 && highestDevotionType && fullRelicData) {
-            const devotionColor = devotionColorMap[highestDevotionType];
+            const devotionColor = nameToColorMap[highestDevotionType];
             const affinity = fullRelicData.devotionAffinity;
 
             if (devotionColor && affinity) {

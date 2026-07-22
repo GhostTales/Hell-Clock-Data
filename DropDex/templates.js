@@ -2,6 +2,7 @@ export { createAllDungeonsListTemplate } from './templates/allDungeonsList.js';
 export { createDungeonTemplate } from './templates/dungeon.js';
 export { createDungeonListTemplate } from './templates/dungeonList.js';
 export { createRelicInDungeonTemplate } from './templates/relicInDungeon.js';
+export { createRelicByBossTemplate } from './templates/relicByBoss.js';
 export { createRelicInTreasureTemplate } from './templates/relicInTreasure.js';
 export { createRelicListTemplate } from './templates/relicList.js';
 export { createRelicTemplate } from './templates/relic.js';
