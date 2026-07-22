@@ -327,9 +327,19 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
         return tierA - tierB;
     });
 
-    let html = '<h3 class="tool-heading">Boss Blessing Drop Chances</h3>';
-    
-    html += createTableHtml('Campaign', campaignNormalRows);
+    let html = '';
+
+    // Handle Campaign section with specific messages for no drops, similar to relicInDungeon.js
+    if (campaignNormalRows.length > 0) {
+        html += createTableHtml('Campaign', campaignNormalRows);
+    } else {
+        html += '<h3 class="tool-heading">Campaign</h3>';
+        const message = campaignOtherRows.length > 0
+            ? 'This relic does not drop from normal Campaign difficulty boss blessings.'
+            : 'This relic does not drop from any Campaign dungeon boss blessings.';
+        html += `<p>${message}</p>`;
+    }
+
     html += createTableHtml('Endless Nightmares', endlessDungeonRows);
     html += createTableHtml('Ascension', ascensionDungeonRows);
     html += createTableHtml('Other Campaign Dungeons', campaignOtherRows, true, 'boss-campaign-other-dungeons');
