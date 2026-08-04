@@ -58,14 +58,40 @@
 <code>&lt;%- await createAllDungeonsListTemplate(allDungeons, ['key1', 'key2']) %&gt;</code>
 <p>If no keys are provided, it will default to showing <code>name</code>, <code>sharedShrines</code>, and <code>locations</code>. Available keys include: <code>id</code>, <code>name</code>, <code>internalName</code>, <code>sharedShrines</code>, <code>locations</code>.</p>
 
-<h2>Dynamically Generated Pages</h2>
-<p>Pages for specific items (relics, dungeons, etc.) are generated dynamically based on the URL. For example, visiting <code>?page=relics/Tempest</code> will automatically generate the page for the "Tempest" relic.</p>
-<p>The content for these pages is pre-defined as an EJS template in <code>Pages/dynamic/</code>. For a relic, it looks like this:</p>
+<h3>Single Item Info Boxes</h3>
+<p>These functions render the full detail infobox for a single item, as seen on the dynamically generated item pages.</p>
+<ul>
+    <li><code>&lt;%- await createRelicTemplate(relic, allAffixData, allSkills) %&gt;</code> - Renders a relic's infobox (icon, affixes, size, devotion affinity, etc.).</li>
+    <li><code>&lt;%- await createTreasureClassTemplate(tc, allTCs, allRelics) %&gt;</code> - Renders a Treasure Class's infobox (contents, weights, sub-classes).</li>
+    <li><code>&lt;%- await createDungeonTemplate(dungeon) %&gt;</code> - Renders a dungeon's infobox (floors and their drop configuration).</li>
+</ul>
 
-<pre><code>&lt;%- await createRelicTemplate(allRelics.find(r => r.id === RELIC_ID)) %&gt;
-&lt;%- await createRelicInTreasureTemplate(allRelics.find(r => r.id === RELIC_ID), allTCs, allRelics) %&gt;
-&lt;%- await createRelicInDungeonTemplate(allRelics.find(r => r.id === RELIC_ID), allDungeons, allTCs, allRelics) %&gt;
+<h3>Relic Drop Chance Lookups</h3>
+<p>These functions calculate and display where a relic can drop, taking the sidebar's devotion points into account when computing "Your Chance". They expect a <code>devotionPoints</code> object (e.g. <code>{ furyPoints, faithPoints, disciplinePoints }</code>), which the parser automatically supplies as the <code>devotionPoints</code> variable on relic pages.</p>
+<ul>
+    <li><code>&lt;%- await createRelicByBossTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %&gt;</code> - Shows drop chances grouped by campaign dungeons, other campaign dungeons, and Endless Nightmare tiers. This is used on the auto-generated relic pages.</li>
+    <li><code>&lt;%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %&gt;</code> - An alternate, simpler list of dungeons that can drop the relic.</li>
+    <li><code>&lt;%- await createRelicInTreasureTemplate(relic, allTCs, allRelics) %&gt;</code> - Lists the Treasure Classes that can directly or indirectly drop the relic.</li>
+</ul>
+
+<h3>Treasure Class Reverse Lookup</h3>
+<p>To find every dungeon that references a given Treasure Class, use <code>createDungeonListTemplate()</code>.</p>
+<p><b>Syntax:</b></p>
+<code>&lt;%- await createDungeonListTemplate(allDungeons, tc) %&gt;</code>
+
+<h2>Dynamically Generated Pages</h2>
+<p>Pages for specific items (relics, dungeons, treasure classes) are generated dynamically based on the URL. For example, visiting <code>?page=relics/Tempest</code> will automatically generate the page for the relic named "Tempest".</p>
+<p>The item type comes from the first URL path segment (<code>relics</code>, <code>dungeons</code>, or <code>treasure_classes</code>) and the remainder of the path is used as the item's display/internal name (available in the EJS scope as <code>itemTitle</code>). The matching template in <code>Pages/dynamic/</code> looks up the item by name (case-insensitive) and renders it. For a relic, the template looks like this:</p>
+
+<pre><code>&lt;% const relic = allRelics.find(r => (getEnLoc(r.nameLocalizationKey) || r.name).toLowerCase() === itemTitle.toLowerCase()); %&gt;
+&lt;% if (relic) { %&gt;
+    &lt;%- await createRelicTemplate(relic, allAffixData, allSkills) %&gt;
+    &lt;%- await createRelicByBossTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %&gt;
+&lt;% } else { %&gt;
+    &lt;p&gt;Relic not found: &lt;%= itemTitle %&gt;&lt;/p&gt;
+&lt;% } %&gt;
 </code></pre>
+<p>Note: a static page created at <code>Pages/&lt;name&gt;.txt</code> always takes priority over a dynamically generated page with the same name.</p>
 
 <h2>Devotion Points System</h2>
 <p>In the sidebar, you can input your character's devotion points for Fury, Faith, and Discipline. These points can increase the drop chance of relics that have an affinity for your highest devotion.</p>
@@ -74,7 +100,7 @@ The calculation is as follows:
 <ul>
     <li>The system identifies your highest devotion (Fury, Faith, or Discipline).</li>
     <li>If there is a single highest devotion (no ties) and the point value is greater than 4, a bonus is applied.</li>
-    <li>The bonus multiplier is calculated as <code>1 + 1 + 0.1 * (points - 4)</code>. For example, 10 points in Fury gives a <code>1 + 1 + 0.1 * (10 - 4) = 2.6x</code> multiplier.</li>
+    <li>The bonus multiplier is calculated as <code>2 + 0.1 * (points - 4)</code>. For example, 10 points in Fury gives a <code>2 + 0.1 * (10 - 4) = 2.6x</code> multiplier.</li>
     <li>This multiplier is applied to the weight of relics that have an affinity for your highest devotion, increasing their drop chance from treasure classes.</li>
     <li>The "Your Chance" column in the tables reflects this adjusted probability.</li>
 </ul>
