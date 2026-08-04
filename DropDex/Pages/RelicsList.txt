@@ -1,9 +1,9 @@
 <h2>List of all unique relics</h2>
 <h3>Specific lists</h3>
 <ul>
-    <li><a href="?page=relics/Uber Relics">Uber Relics</a></li>
-    <li><a href="?page=relics/Nightmare Relics">Nightmare Relics</a></li>
-    <li><a href="?page=relics/Community Relics">Community Relics</a></li>
+    <li><a href="?p=r/Uber Relics">Uber Relics</a></li>
+    <li><a href="?p=r/Nightmare Relics">Nightmare Relics</a></li>
+    <li><a href="?p=r/Community Relics">Community Relics</a></li>
 </ul>
 
 

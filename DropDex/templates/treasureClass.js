@@ -1,5 +1,6 @@
 import { getGameData } from '../data.js';
 import { getEnLoc } from './utils.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML template for a Treasure Class.
@@ -47,7 +48,7 @@ export async function createTreasureClassTemplate(tc, allTCs, allRelics) {
             const subTc = allTCs.find(t => t.id === subTcId);
             const subTcName = subTc ? subTc.name : item.value.treasureClass.name;
             const encodedName = encodeURIComponent(subTcName);
-            const subTcLink = `<a href="?page=treasure_classes/${encodedName}">${subTcName}</a>`;
+            const subTcLink = `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${subTcName}</a>`;
             const amountLimit = item.value.useLimit ? `${item.value.amountLimit[0]} - ${item.value.amountLimit[1]}` : 'N/A';
             dropsHtml += `<tr><td>${item.weight.toFixed(1)}</td><td>${subTcLink}</td><td>${amountLimit}</td></tr>`;
         }
@@ -82,7 +83,7 @@ export async function createTreasureClassTemplate(tc, allTCs, allRelics) {
             const relicDef = allRelics.find(r => r.id === item.value.id);
             const relicName = relicDef ? (getEnLoc(relicDef.nameLocalizationKey) || relicDef.name) : item.value.name;
             const encodedName = encodeURIComponent(relicName);
-            dropsHtml += `<tr><td>${item.weight.toFixed(1)}</td><td><a href="?page=relics/${encodedName}">${relicName}</a></td></tr>`;
+            dropsHtml += `<tr><td>${item.weight.toFixed(1)}</td><td><a href="${buildPageHref(`relics/${encodedName}`)}">${relicName}</a></td></tr>`;
         }
         dropsHtml += '</tbody></table>';
     }

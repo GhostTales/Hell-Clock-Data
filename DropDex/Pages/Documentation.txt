@@ -8,11 +8,12 @@
 <p>You can create links to other pages using standard HTML <code>&lt;a&gt;</code> tags.</p>
 
 <p><b>Syntax:</b></p>
-<code>&lt;a href="?page=Page_Name"&gt;Display Text&lt;/a&gt;</code>
+<code>&lt;a href="?p=Page_Name_or_path"&gt;Display Text&lt;/a&gt;</code>
 
 <p><b>Examples:</b></p>
 <ul>
-    <li><code>&lt;a href="?page=MainPage"&gt;Main Page&lt;/a&gt;</code> will create a link to the main page.</li>
+    <li><code>&lt;a href="?p=MainPage"&gt;Main Page&lt;/a&gt;</code> will create a link to the main page.</li>
+    <li><code>&lt;a href="?p=r/Tempest"&gt;Tempest&lt;/a&gt;</code> will create a link to a relic page.</li>
 </ul>
 
 <h2>External Links</h2>
@@ -80,8 +81,8 @@
 <code>&lt;%- await createDungeonListTemplate(allDungeons, tc) %&gt;</code>
 
 <h2>Dynamically Generated Pages</h2>
-<p>Pages for specific items (relics, dungeons, treasure classes) are generated dynamically based on the URL. For example, visiting <code>?page=relics/Tempest</code> will automatically generate the page for the relic named "Tempest".</p>
-<p>The item type comes from the first URL path segment (<code>relics</code>, <code>dungeons</code>, or <code>treasure_classes</code>) and the remainder of the path is used as the item's display/internal name (available in the EJS scope as <code>itemTitle</code>). The matching template in <code>Pages/dynamic/</code> looks up the item by name (case-insensitive) and renders it. For a relic, the template looks like this:</p>
+<p>Pages for specific items (relics, dungeons, treasure classes) are generated dynamically based on the URL. For example, visiting <code>?p=r/Tempest</code> will automatically generate the page for the relic named "Tempest".</p>
+<p>The item type comes from the first URL path segment (<code>r</code>, <code>d</code>, or <code>t</code>, which map to <code>relics</code>, <code>dungeons</code>, and <code>treasure_classes</code>) and the remainder of the path is used as the item's display/internal name (available in the EJS scope as <code>itemTitle</code>). The matching template in <code>Pages/dynamic/</code> looks up the item by name (case-insensitive) and renders it. For a relic, the template looks like this:</p>
 
 <pre><code>&lt;% const relic = allRelics.find(r => (getEnLoc(r.nameLocalizationKey) || r.name).toLowerCase() === itemTitle.toLowerCase()); %&gt;
 &lt;% if (relic) { %&gt;
@@ -92,6 +93,7 @@
 &lt;% } %&gt;
 </code></pre>
 <p>Note: a static page created at <code>Pages/&lt;name&gt;.txt</code> always takes priority over a dynamically generated page with the same name.</p>
+<p>Legacy links with <code>?page=</code> and long item types still work for backward compatibility.</p>
 
 <h2>Devotion Points System</h2>
 <p>In the sidebar, you can input your character's devotion points for Fury, Faith, and Discipline. These points can increase the drop chance of relics that have an affinity for your highest devotion.</p>

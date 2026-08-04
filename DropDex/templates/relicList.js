@@ -1,5 +1,6 @@
 import { getEnLoc, nonUniqueRelicIconMap, devotionColorMap, relicSizeMap } from './utils.js';
 import { formatAffixDescription } from './formatters.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML table for a list of relics with customizable columns.
@@ -98,7 +99,7 @@ export async function createRelicListTemplate(relics, allAffixData, options = {}
                 case 'name':
                     const relicName = getEnLoc(relic.nameLocalizationKey) || relic.name;
                     const encodedName = encodeURIComponent(relicName);
-                    cellContent = `<a href="?page=relics/${encodedName}">${relicName}</a>`;
+                    cellContent = `<a href="${buildPageHref(`relics/${encodedName}`)}">${relicName}</a>`;
                     break;
                 case 'devotion':
                 case 'devotionaffinity':

@@ -2,6 +2,7 @@ import { getGameData } from './data.js';
 import { getEnLoc } from './templates.js';
 import { formatAffixDescription } from './templates/formatters.js';
 import { nonUniqueRelicIconMap } from './templates/utils.js';
+import { buildPageHref } from './routes.js';
 
 let searchIndex = null;
 
@@ -75,7 +76,7 @@ export async function buildSearchIndex() {
             const staticPages = await response.json();
             staticPages.forEach(p => {
                 // Manifest format: { "name": "Display Name", "path": "Page/Path_Without_Extension" }
-                index.push({ name: p.name, url: `?page=${p.path}` });
+                index.push({ name: p.name, url: buildPageHref(p.path) });
             });
             staticPagesAdded = true;
         }
@@ -92,7 +93,7 @@ export async function buildSearchIndex() {
             { name: 'Examples', page: 'Examples' },
             { name: 'Dungeon List', page: 'DungeonList' }
         ];
-        fallbackStaticPages.forEach(p => index.push({ name: p.name, url: `?page=${p.page}` }));
+        fallbackStaticPages.forEach(p => index.push({ name: p.name, url: buildPageHref(p.page) }));
     }
 
     // Add relics
@@ -113,7 +114,7 @@ export async function buildSearchIndex() {
                 }
                 index.push({
                     name: name,
-                    url: `?page=relics/${encodeURIComponent(name)}`,
+                    url: buildPageHref(`relics/${encodeURIComponent(name)}`),
                     searchText: searchText.toLowerCase(),
                     icon: getRelicIconUrl(relic),
                     intrinsicAffixesHtml: intrinsicAffixesHtml
@@ -126,7 +127,7 @@ export async function buildSearchIndex() {
     const treasureClasses = await getGameData('Treasure Class.json');
     if (treasureClasses) {
         treasureClasses.forEach(tc => {
-            index.push({ name: tc.name, url: `?page=treasure_classes/${encodeURIComponent(tc.name)}` });
+            index.push({ name: tc.name, url: buildPageHref(`treasure_classes/${encodeURIComponent(tc.name)}`) });
         });
     }
 
@@ -134,7 +135,7 @@ export async function buildSearchIndex() {
     const dungeons = await getGameData('Dungeons.json');
     if (dungeons) {
         dungeons.forEach(dungeon => {
-            index.push({ name: dungeon.name, url: `?page=dungeons/${encodeURIComponent(dungeon.name)}` });
+            index.push({ name: dungeon.name, url: buildPageHref(`dungeons/${encodeURIComponent(dungeon.name)}`) });
         });
     }
 
@@ -160,7 +161,7 @@ export function initializeSearch(navigate) {
             event.preventDefault();
             const query = searchInput.value.trim();
             if (query) {
-                navigate(`?page=Search&query=${encodeURIComponent(query)}`);
+                navigate(buildPageHref('Search', { q: query }));
             }
         }
     });

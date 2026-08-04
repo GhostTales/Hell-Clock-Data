@@ -2,6 +2,7 @@ import { getGameData } from './data.js';
 import { getEnLoc } from './templates.js';
 import { parseContent } from './parser.js';
 import { initializeSearch, buildSearchIndex } from './search.js';
+import { buildPageHref, isInternalRouteHref, parseRoute } from './routes.js';
 
 /**
  * Calculates the Levenshtein distance between two strings.
@@ -117,8 +118,7 @@ async function loadPage(pageName, options = {}) {
 
     try {
         if (pageName === 'Search') {
-            const urlParams = new URLSearchParams(window.location.search);
-            const query = urlParams.get('query') || '';
+            const { query } = parseRoute(window.location.search);
             pageTitle = `Search results for "${query}"`;
 
             const searchIndex = await buildSearchIndex();
@@ -161,7 +161,7 @@ async function loadPage(pageName, options = {}) {
                 // Only suggest if the match is reasonably close.
                 const threshold = Math.max(2, Math.floor(query.length / 3));
                 if (bestMatch && minDistance <= threshold) {
-                    suggestionHtml = `<div class="search-suggestion">Did you mean: <a href="?page=Search&query=${encodeURIComponent(bestMatch.name)}">${bestMatch.name}</a>?</div>`;
+                    suggestionHtml = `<div class="search-suggestion">Did you mean: <a href="${buildPageHref('Search', { q: bestMatch.name })}">${bestMatch.name}</a>?</div>`;
                     const suggestedTerms = bestMatch.name.toLowerCase().split(' ').filter(t => t.length > 0);
                     filtered = searchIndex.filter(item => {
                         const currentItemName = item.name.toLowerCase();
@@ -302,8 +302,7 @@ function setupDevotionListeners() {
 
     // Create a debounced version of the page loader for devotion updates
     const debouncedLoadPageForDevotion = debounce(() => {
-        const currentUrlParams = new URLSearchParams(window.location.search);
-        const currentPageName = currentUrlParams.get('page') || 'Main_Page';
+        const { pageName: currentPageName } = parseRoute(window.location.search);
         loadPage(currentPageName, { isDevotionUpdate: true });
     }, 400); // 400ms delay
 
@@ -323,18 +322,19 @@ function setupDevotionListeners() {
 
 /**
  * Navigates to a new page, updating history and loading content.
- * @param {string} href - The destination URL (e.g., '?page=Search&query=item').
+ * @param {string} href - The destination URL (e.g., '?p=Search&q=item').
  */
 function navigate(href) {
+    const { pageName, query } = parseRoute(href);
+    const normalizedHref = buildPageHref(pageName, query ? { q: query } : {});
+
     // Prevent re-loading the same page.
-    if (href === window.location.search) {
+    if (normalizedHref === window.location.search) {
         return;
     }
-    const urlParams = new URLSearchParams(href);
-    const pageName = urlParams.get('page');
 
     if (pageName) {
-        history.pushState({ page: pageName }, '', href);
+        history.pushState({ page: pageName }, '', normalizedHref);
         loadPage(pageName);
     }
 }
@@ -343,22 +343,25 @@ function navigate(href) {
  * Initializes the DropDex router and loads the correct page.
  */
 function initialize() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pageName = urlParams.get('page') || 'Main_Page'; // Default to Main_Page
+    const { pageName, query } = parseRoute(window.location.search);
+    const normalizedHref = buildPageHref(pageName, query ? { q: query } : {});
+    if (normalizedHref !== window.location.search) {
+        history.replaceState({ page: pageName }, '', normalizedHref);
+    }
+
     loadPage(pageName);
     initializeSearch(navigate);
 
     // Handle back/forward browser buttons
     window.addEventListener('popstate', () => {
-        const popUrlParams = new URLSearchParams(window.location.search);
-        const pageName = popUrlParams.get('page') || 'Main_Page';
+        const { pageName } = parseRoute(window.location.search);
         loadPage(pageName);
     });
 
     // Intercept clicks on internal links to enable SPA-style navigation
     document.addEventListener('click', (event) => {
         const anchor = event.target.closest('a');
-        if (anchor && anchor.getAttribute('href')?.startsWith('?page=') && anchor.target !== '_blank' && !event.ctrlKey && !event.metaKey) {
+        if (anchor && isInternalRouteHref(anchor.getAttribute('href')) && anchor.target !== '_blank' && !event.ctrlKey && !event.metaKey) {
             event.preventDefault();
             navigate(anchor.getAttribute('href'));
         }

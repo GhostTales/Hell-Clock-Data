@@ -1,4 +1,5 @@
 import { DungeonConfigNameShorthandMap } from './utils.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML table for a list of all dungeons.
@@ -33,7 +34,7 @@ export async function createAllDungeonsListTemplate(dungeons, keys) {
                 case 'name':
                     const dungeonName = DungeonConfigNameShorthandMap[dungeon.name] || dungeon.name;
                     const encodedName = encodeURIComponent(dungeon.name);
-                    cellContent = `<a href="?page=dungeons/${encodedName}">${dungeonName}</a>`;
+                    cellContent = `<a href="${buildPageHref(`dungeons/${encodedName}`)}">${dungeonName}</a>`;
                     break;
                 case 'internalname':
                     cellContent = dungeon.name;

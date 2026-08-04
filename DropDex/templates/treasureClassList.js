@@ -1,3 +1,5 @@
+import { buildPageHref } from '../routes.js';
+
 /**
  * Creates an HTML table for a list of treasure classes.
  * @param {Array<object>} treasureClasses - The array of treasure class data objects.
@@ -30,7 +32,7 @@ export async function createTreasureClassListTemplate(treasureClasses, keys) {
             switch (key.toLowerCase()) {
                 case 'name':
                     const encodedName = encodeURIComponent(tc.name);
-                    cellContent = `<a href="?page=treasure_classes/${encodedName}">${tc.name}</a>`;
+                    cellContent = `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${tc.name}</a>`;
                     break;
                 default:
                     cellContent = tc[key] !== undefined ? tc[key] : 'N/A';

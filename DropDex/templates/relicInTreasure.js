@@ -1,5 +1,6 @@
 import { getGameData } from '../data.js';
 import { calculateModifiedRelicWeights, devotionColorMap } from './utils.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML list of Treasure Classes that can drop a specific relic, including drop chances based on devotion points.
@@ -65,7 +66,7 @@ export async function createRelicInTreasureTemplate(relic, allTreasureClasses, a
         const yourChance = yourTotalWeight > 0 ? (yourRelicWeight / yourTotalWeight) * 100 : 0;
         
         const encodedTcName = encodeURIComponent(tc.name);
-        const tcLink = `<a href="?page=treasure_classes/${encodedTcName}">${tc.name}</a>`;
+        const tcLink = `<a href="${buildPageHref(`treasure_classes/${encodedTcName}`)}">${tc.name}</a>`;
 
         const maxTier = (tc.tiers && tc.tiers.length > 0) 
             ? Math.max(...tc.tiers.map(t => t.value)) 

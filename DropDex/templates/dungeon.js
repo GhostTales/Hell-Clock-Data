@@ -1,4 +1,5 @@
 import { getEnLoc } from './utils.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML representation of a dungeon page.
@@ -39,7 +40,7 @@ export async function createDungeonTemplate(dungeon) {
                 if (tc && tc.name) {
                     hasContent = true;
                     const encodedName = encodeURIComponent(tc.name);
-                    const tcLink = `<a href="?page=treasure_classes/${encodedName}">${tc.name}</a>`;
+                    const tcLink = `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${tc.name}</a>`;
                     floorTcsHtml += `<tr><td>${source}</td><td>${tcLink}</td></tr>`;
                 }
             }
@@ -50,7 +51,7 @@ export async function createDungeonTemplate(dungeon) {
                     if (tc && tc.name) {
                         hasContent = true;
                         const encodedName = encodeURIComponent(tc.name);
-                        const tcLink = `<a href="?page=treasure_classes/${encodedName}">${tc.name}</a>`;
+                        const tcLink = `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${tc.name}</a>`;
                         floorTcsHtml += `<tr><td>${chestType} Chest</td><td>${tcLink}</td></tr>`;
                     }
                 }

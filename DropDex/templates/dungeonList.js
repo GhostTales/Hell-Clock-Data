@@ -1,4 +1,5 @@
 import { DungeonConfigNameShorthandMap } from './utils.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML table of dungeons that contain a specific Treasure Class.
@@ -75,7 +76,7 @@ export async function createDungeonListTemplate(allDungeons, targetTc) {
     for (const entry of containingDungeons) {
         const dungeonName = DungeonConfigNameShorthandMap[entry.dungeon.name] || entry.dungeon.name;
         const encodedName = encodeURIComponent(entry.dungeon.name);
-        const dungeonLink = `<a href="?page=dungeons/${encodedName}">${dungeonName}</a>`;
+        const dungeonLink = `<a href="${buildPageHref(`dungeons/${encodedName}`)}">${dungeonName}</a>`;
         tableHtml += `<tr><td>${dungeonLink}</td><td>${entry.sources}</td></tr>`;
     }
     tableHtml += '</tbody></table>';

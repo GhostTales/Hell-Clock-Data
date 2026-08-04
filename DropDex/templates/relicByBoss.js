@@ -1,6 +1,7 @@
 import { getGameData } from '../data.js';
 import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap } from './utils.js';
 import { dungeonToBossTCs, nightmareRelicBossTCs } from './dungeonBossMap.js';
+import { buildPageHref } from '../routes.js';
 
 /**
  * Creates an HTML table row for a dungeon's boss drops.
@@ -9,7 +10,7 @@ import { dungeonToBossTCs, nightmareRelicBossTCs } from './dungeonBossMap.js';
  */
 function createRowHtml(row) {
     const encodedDungeonName = encodeURIComponent(row.dungeonInternalName);
-    const dungeonLink = `<a href="?page=dungeons/${encodedDungeonName}">${row.dungeonName}</a>`;
+    const dungeonLink = `<a href="${buildPageHref(`dungeons/${encodedDungeonName}`)}">${row.dungeonName}</a>`;
     return `<tr>
         <td>${dungeonLink}</td>
         <td>${row.maxTier}</td>
