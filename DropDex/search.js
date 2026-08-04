@@ -1,7 +1,59 @@
 import { getGameData } from './data.js';
 import { getEnLoc } from './templates.js';
+import { formatAffixDescription } from './templates/formatters.js';
+import { nonUniqueRelicIconMap } from './templates/utils.js';
 
 let searchIndex = null;
+
+/**
+ * Builds a plain-text, lowercased blob of an intrinsic affix's name and
+ * description (with any HTML markup stripped) so it can be matched against
+ * search terms.
+ * @param {object} entry - An entry from a relic's intrinsicAffixes array.
+ * @param {Array<object>} allAffixData - All affix definitions.
+ * @returns {string} The searchable text for the affix.
+ */
+function getIntrinsicAffixSearchText(entry, allAffixData) {
+    const parts = [entry.name];
+    const affixDef = allAffixData.find(a => a.id === entry.id);
+    if (affixDef) {
+        const description = formatAffixDescription(affixDef).replace(/<[^>]+>/g, ' ');
+        parts.push(description);
+    }
+    return parts.join(' ');
+}
+
+/**
+ * Builds an HTML list of a relic's intrinsic affixes with formatted descriptions.
+ * @param {Array<object>} affixes - The relic's intrinsicAffixes array.
+ * @param {Array<object>} allAffixData - All affix definitions.
+ * @returns {string} HTML string, or an empty string if there are no affixes.
+ */
+function getIntrinsicAffixesHtml(affixes, allAffixData) {
+    if (!affixes || affixes.length === 0) return "";
+    // According to user feedback, there's only one intrinsic, so no list is needed.
+    const entry = affixes[0];
+    if (!entry) return "";
+
+    const affixDef = allAffixData.find((a) => a.id === entry.id);
+    const description = affixDef ? formatAffixDescription(affixDef) : entry.name;
+    return `<div class="search-result-affixes">${description}</div>`;
+}
+
+/**
+ * Resolves the icon URL for a relic, falling back to the manual non-unique icon map.
+ * @param {object} relic - The relic data object.
+ * @returns {string|null} The icon URL, or null if none could be resolved.
+ */
+function getRelicIconUrl(relic) {
+    let spriteNames = relic.sprite;
+    if (!spriteNames && nonUniqueRelicIconMap[relic.name]) {
+        spriteNames = nonUniqueRelicIconMap[relic.name];
+    }
+    if (!spriteNames) return null;
+    const spriteName = Array.isArray(spriteNames) ? spriteNames[0] : spriteNames;
+    return `https://raw.githubusercontent.com/RogueSnail/hellclock-data-export/main/icons/${spriteName}.png`;
+}
 
 /**
  * Builds the search index from game data. Caches the result.
@@ -45,11 +97,27 @@ export async function buildSearchIndex() {
 
     // Add relics
     const relics = await getGameData('Relics.json');
+    const allAffixData = await getGameData('Relic Affixes.json');
     if (relics) {
         relics.forEach(relic => {
             if (relic.canDrop) {
                 const name = getEnLoc(relic.nameLocalizationKey) || relic.name;
-                index.push({ name: name, url: `?page=relics/${encodeURIComponent(name)}` });
+                let searchText = name;
+                let intrinsicAffixesHtml = '';
+                if (allAffixData && relic.intrinsicAffixes && relic.intrinsicAffixes.length > 0) {
+                    const affixText = relic.intrinsicAffixes
+                        .map(entry => getIntrinsicAffixSearchText(entry, allAffixData))
+                        .join(' ');
+                    searchText = `${name} ${affixText}`;
+                    intrinsicAffixesHtml = getIntrinsicAffixesHtml(relic.intrinsicAffixes, allAffixData);
+                }
+                index.push({
+                    name: name,
+                    url: `?page=relics/${encodeURIComponent(name)}`,
+                    searchText: searchText.toLowerCase(),
+                    icon: getRelicIconUrl(relic),
+                    intrinsicAffixesHtml: intrinsicAffixesHtml
+                });
             }
         });
     }

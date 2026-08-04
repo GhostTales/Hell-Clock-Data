@@ -128,8 +128,8 @@ async function loadPage(pageName, options = {}) {
 
             if (searchTerms.length > 0) {
                 filtered = searchIndex.filter(item => {
-                    const itemName = item.name.toLowerCase();
-                    return searchTerms.every(term => itemName.includes(term));
+                    const itemText = item.searchText || item.name.toLowerCase();
+                    return searchTerms.every(term => itemText.includes(term));
                 });
             }
 
@@ -173,7 +173,10 @@ async function loadPage(pageName, options = {}) {
             let resultsHtml = '<ul class="search-results-list">';
             if (filtered.length > 0) {
                 filtered.forEach(item => {
-                    resultsHtml += `<li><a href="${item.url}">${item.name}</a></li>`;
+                    const iconHtml = item.icon
+                        ? `<img src="${item.icon}" alt="" class="search-result-icon" onerror="this.style.display='none'">`
+                        : '';
+                    resultsHtml += `<li>${iconHtml}<a href="${item.url}">${item.name}</a>${item.intrinsicAffixesHtml || ''}</li>`;
                 });
             } else {
                 resultsHtml += '<li>No results found.</li>';
