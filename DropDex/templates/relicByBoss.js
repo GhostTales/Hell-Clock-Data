@@ -149,7 +149,7 @@ function findBlessingDropsInTc(tc, relic, allTreasureClasses, allRelics, devotio
         const baseChance = getRelicDropChanceInTc(tc, relic.id, allTreasureClasses, allRelics, {}, {}, null, 1);
         const yourChance = getRelicDropChanceInTc(tc, relic.id, allTreasureClasses, allRelics, devotionData.devotions, devotionData.devotionColorMap, devotionData.highestDevotionType, devotionData.devotionBonus);
 
-        if (yourChance > 0) {
+        if (baseChance > 0) {
             let maxTier = 'N/A';
             let maxTierChance = 0;
 
