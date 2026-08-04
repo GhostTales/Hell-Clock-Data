@@ -7,13 +7,18 @@ import * as templates from './templates.js';
  * @returns {Promise<string>} The parsed content as an HTML string.
  */
 export async function parseContent(textContent, extraContext = {}) {
+    const readArrayData = async (path) => {
+        const data = await getGameData(path);
+        return Array.isArray(data) ? data : [];
+    };
+
     // Pre-load all necessary data to pass to the templates.
     // This avoids multiple fetches within template functions.
-    const allAffixData = await getGameData('Relic Affixes.json');
-    const allRelics = await getGameData('Relics.json');
-    const allTCs = await getGameData('Treasure Class.json');
-    const allDungeons = await getGameData('Dungeons.json');
-    const allSkills = await getGameData('Skills.json');
+    const allAffixData = await readArrayData('Relic Affixes.json');
+    const allRelics = await readArrayData('Relics.json');
+    const allTCs = await readArrayData('Treasure Class.json');
+    const allDungeons = await readArrayData('Dungeons.json');
+    const allSkills = await readArrayData('Skills.json');
 
     const context = {
         // Pass all template functions from /templates/index.js

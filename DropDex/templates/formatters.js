@@ -72,8 +72,11 @@ export function formatAffixDescription(affixDef) {
                 }
             }
         } else { // Handle static placeholders from additionalLocalizationVariables
-            const locVar = affixDef.additionalLocalizationVariables[index - 1];
-            const varName = locVar.skillEffectVariableReference.valueOrName;
+            const locVar = affixDef.additionalLocalizationVariables?.[index - 1];
+            const varName = locVar?.skillEffectVariableReference?.valueOrName;
+            if (!varName) {
+                return '...';
+            }
             const varDef = affixDef.behaviorData?.variables?.variables.find(v => v.name === varName);
             if (varDef) {
                 return `<code>${formatValue(varDef.baseValue, affixDef, varDef)}</code>`;

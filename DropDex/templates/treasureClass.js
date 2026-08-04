@@ -1,4 +1,3 @@
-import { getGameData } from '../data.js';
 import { getEnLoc } from './utils.js';
 import { buildPageHref } from '../routes.js';
 

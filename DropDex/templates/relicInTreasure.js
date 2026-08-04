@@ -1,5 +1,4 @@
-import { getGameData } from '../data.js';
-import { calculateModifiedRelicWeights, devotionColorMap } from './utils.js';
+import { calculateModifiedRelicWeights, devotionColorMap, getDevotionBonusContext } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
 /**
@@ -14,27 +13,17 @@ export async function createRelicInTreasureTemplate(relic, allTreasureClasses, a
         return '<span class="error">[Relic not found]</span>';
     }
 
-    const furyPoints = parseInt(document.getElementById('furyPoints')?.value, 10) || 0;
-    const faithPoints = parseInt(document.getElementById('faithPoints')?.value, 10) || 0;
-    const disciplinePoints = parseInt(document.getElementById('disciplinePoints')?.value, 10) || 0;
-
-    const devotions = {
-        "Fury": furyPoints,
-        "Faith": faithPoints,
-        "Discipline": disciplinePoints
-    };
-
-    const maxDevotion = Math.max(...Object.values(devotions));
-    const highestDevotions = Object.keys(devotions).filter(key => devotions[key] === maxDevotion);
-    
-    let devotionBonus = 1;
-    let highestDevotionType = null;
-
-    if (highestDevotions.length === 1 && maxDevotion > 4) {
-        highestDevotionType = highestDevotions[0];
-        const amount_points = maxDevotion - 4;
-        devotionBonus = 2 + 0.1 * amount_points;
-    }
+    const {
+        devotions,
+        maxDevotion,
+        highestDevotions,
+        highestDevotionType,
+        devotionBonus,
+    } = getDevotionBonusContext({
+        furyPoints: document.getElementById('furyPoints')?.value,
+        faithPoints: document.getElementById('faithPoints')?.value,
+        disciplinePoints: document.getElementById('disciplinePoints')?.value,
+    });
 
     const containingTCs = allTreasureClasses.filter(tc => 
         tc.availableRelics && tc.availableRelics.some(r => r.value.id === relic.id)

@@ -1,5 +1,4 @@
-import { getGameData } from '../data.js';
-import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap } from './utils.js';
+import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap, getDevotionBonusContext, getFloorTreasureClassRefs } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
 /**
@@ -32,27 +31,13 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
         return '<span class="error">[Relic not found]</span>';
     }
 
-    const furyPoints = devotionPoints.furyPoints || 0;
-    const faithPoints = devotionPoints.faithPoints || 0;
-    const disciplinePoints = devotionPoints.disciplinePoints || 0;
-
-    const devotions = {
-        "Fury": furyPoints,
-        "Faith": faithPoints,
-        "Discipline": disciplinePoints
-    };
-
-    const maxDevotion = Math.max(...Object.values(devotions));
-    const highestDevotions = Object.keys(devotions).filter(key => devotions[key] === maxDevotion);
-    
-    let devotionBonus = 1;
-    let highestDevotionType = null;
-
-    if (highestDevotions.length === 1 && maxDevotion > 4) {
-        highestDevotionType = highestDevotions[0];
-        const amount_points = maxDevotion - 4;
-        devotionBonus = 2 + 0.1 * amount_points;
-    }
+    const {
+        devotions,
+        maxDevotion,
+        highestDevotions,
+        highestDevotionType,
+        devotionBonus,
+    } = getDevotionBonusContext(devotionPoints);
 
     const campaignNormalRows = [];
     const campaignOtherRows = [];
@@ -69,19 +54,7 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
 
         if (dungeon.dropBalance && Array.isArray(dungeon.dropBalance.floorDropConfigs)) {
             for (const floorConfig of dungeon.dropBalance.floorDropConfigs) {
-                const tcRefs = {
-                    "Regular Enemy": floorConfig.regularEnemyTreasureClass,
-                    "Champion Enemy": floorConfig.championEnemyTreasureClass,
-                    "Rare Enemy": floorConfig.rareEnemyTreasureClass,
-                    "Unique Enemy": floorConfig.uniqueEnemyTreasureClass,
-                    "Boss": floorConfig.bossTreasureClass,
-                    "Breakable": floorConfig.breakableTreasureClass,
-                    "Basic Gear": floorConfig.basicGearTreasureClass,
-                    "Blessed Gear": floorConfig.blessedGearTreasureClass,
-                    "Relic": floorConfig.relicTreasureClass,
-                    "Unique Relic": floorConfig.uniqueRelicTreasureClass,
-                    ...floorConfig.chestTreasureClass // Spread chest TCs if they exist
-                };
+                const tcRefs = getFloorTreasureClassRefs(floorConfig);
 
                 for (const key in tcRefs) {
                     const tcRef = tcRefs[key];

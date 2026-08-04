@@ -1,4 +1,4 @@
-import { getEnLoc } from './utils.js';
+import { getFloorTreasureClassRefs } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
 /**
@@ -19,18 +19,7 @@ export async function createDungeonTemplate(dungeon) {
         for (const floorConfig of sortedFloors) {
             floorsHtml += `<h3 class="tool-heading">Floor ${floorConfig.floor}</h3>`;
             
-            const tcRefs = {
-                "Regular Enemy": floorConfig.regularEnemyTreasureClass,
-                "Champion Enemy": floorConfig.championEnemyTreasureClass,
-                "Rare Enemy": floorConfig.rareEnemyTreasureClass,
-                "Unique Enemy": floorConfig.uniqueEnemyTreasureClass,
-                "Boss": floorConfig.bossEnemyTreasureClass,
-                "Breakable": floorConfig.breakableTreasureClass,
-                "Basic Gear": floorConfig.basicGearTreasureClass,
-                "Blessed Gear": floorConfig.blessedGearTreasureClass,
-                "Relic": floorConfig.relicTreasureClass,
-                "Unique Relic": floorConfig.uniqueRelicTreasureClass,
-            };
+            const tcRefs = getFloorTreasureClassRefs(floorConfig);
 
             let floorTcsHtml = '';
             let hasContent = false;
@@ -42,18 +31,6 @@ export async function createDungeonTemplate(dungeon) {
                     const encodedName = encodeURIComponent(tc.name);
                     const tcLink = `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${tc.name}</a>`;
                     floorTcsHtml += `<tr><td>${source}</td><td>${tcLink}</td></tr>`;
-                }
-            }
-
-            if (floorConfig.chestTreasureClass && typeof floorConfig.chestTreasureClass === 'object') {
-                for (const chestType in floorConfig.chestTreasureClass) {
-                    const tc = floorConfig.chestTreasureClass[chestType];
-                    if (tc && tc.name) {
-                        hasContent = true;
-                        const encodedName = encodeURIComponent(tc.name);
-                        const tcLink = `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${tc.name}</a>`;
-                        floorTcsHtml += `<tr><td>${chestType} Chest</td><td>${tcLink}</td></tr>`;
-                    }
                 }
             }
 

@@ -1,5 +1,5 @@
-<% const safeTitle = itemTitle.replace(/'/g, "\\'"); %>
-<% const dungeon = allDungeons.find(d => d.name.toLowerCase() === safeTitle.toLowerCase()); %>
+<% const normalizedTitle = String(itemTitle || '').toLowerCase(); %>
+<% const dungeon = allDungeons.find(d => d.name.toLowerCase() === normalizedTitle); %>
 <% if (dungeon) { %>
     <%- await createDungeonTemplate(dungeon) %>
 <% } else { %>

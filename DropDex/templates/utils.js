@@ -1,5 +1,3 @@
-import { getGameData } from '../data.js';
-
 // Manual mapping for non-unique relics that are missing the 'sprite' property.
 export const nonUniqueRelicIconMap = {
     // Example: "InternalRelicName": "icon_file_name_without_extension"
@@ -85,6 +83,76 @@ export const getEnLoc = (locKey) => {
     const en = locKey.find(l => l.langCode === 'en');
     return en ? en.langTranslation : '';
 };
+
+export function getRelicSpriteNames(relic) {
+    if (!relic) return null;
+    if (relic.sprite) return relic.sprite;
+    return nonUniqueRelicIconMap[relic.name] || null;
+}
+
+export function getRelicIconUrl(relic) {
+    const spriteNames = getRelicSpriteNames(relic);
+    if (!spriteNames) return null;
+
+    const spriteName = Array.isArray(spriteNames) ? spriteNames[0] : spriteNames;
+    return `https://raw.githubusercontent.com/RogueSnail/hellclock-data-export/main/icons/${spriteName}.png`;
+}
+
+export function getDevotionBonusContext(devotionPoints = {}) {
+    const safePoints = (value) => {
+        const numberValue = Number(value);
+        return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : 0;
+    };
+
+    const devotions = {
+        Fury: safePoints(devotionPoints.furyPoints),
+        Faith: safePoints(devotionPoints.faithPoints),
+        Discipline: safePoints(devotionPoints.disciplinePoints),
+    };
+
+    const maxDevotion = Math.max(...Object.values(devotions));
+    const highestDevotions = Object.keys(devotions).filter(key => devotions[key] === maxDevotion);
+
+    let devotionBonus = 1;
+    let highestDevotionType = null;
+
+    if (highestDevotions.length === 1 && maxDevotion > 4) {
+        highestDevotionType = highestDevotions[0];
+        const extraPoints = maxDevotion - 4;
+        devotionBonus = 2 + (0.1 * extraPoints);
+    }
+
+    return {
+        devotions,
+        maxDevotion,
+        highestDevotions,
+        highestDevotionType,
+        devotionBonus,
+    };
+}
+
+export function getFloorTreasureClassRefs(floorConfig) {
+    const refs = {
+        "Regular Enemy": floorConfig.regularEnemyTreasureClass,
+        "Champion Enemy": floorConfig.championEnemyTreasureClass,
+        "Rare Enemy": floorConfig.rareEnemyTreasureClass,
+        "Unique Enemy": floorConfig.uniqueEnemyTreasureClass,
+        "Boss": floorConfig.bossEnemyTreasureClass,
+        "Breakable": floorConfig.breakableTreasureClass,
+        "Basic Gear": floorConfig.basicGearTreasureClass,
+        "Blessed Gear": floorConfig.blessedGearTreasureClass,
+        "Relic": floorConfig.relicTreasureClass,
+        "Unique Relic": floorConfig.uniqueRelicTreasureClass,
+    };
+
+    if (floorConfig.chestTreasureClass && typeof floorConfig.chestTreasureClass === 'object') {
+        for (const chestType in floorConfig.chestTreasureClass) {
+            refs[`${chestType} Chest`] = floorConfig.chestTreasureClass[chestType];
+        }
+    }
+
+    return refs;
+}
 
 export function calculateModifiedRelicWeights(availableRelics, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus) {
     // Create a reverse map for looking up color by devotion name, used for the affinity bonus.

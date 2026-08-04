@@ -1,8 +1,32 @@
-import { getGameData } from './data.js';
-import { getEnLoc } from './templates.js';
 import { parseContent } from './parser.js';
 import { initializeSearch, buildSearchIndex } from './search.js';
 import { buildPageHref, isInternalRouteHref, parseRoute } from './routes.js';
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function parseNonNegativeInt(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function bindImageErrorHandlers(root = document) {
+    root.querySelectorAll('img[data-hide-on-error="true"]').forEach((img) => {
+        if (img.dataset.errorHandlerBound === 'true') {
+            return;
+        }
+        img.dataset.errorHandlerBound = 'true';
+        img.addEventListener('error', () => {
+            img.style.display = 'none';
+        });
+    });
+}
 
 /**
  * Calculates the Levenshtein distance between two strings.
@@ -74,7 +98,7 @@ async function loadPage(pageName, options = {}) {
         }
     } else {
         // For full page loads, show the loading message
-        mainContent.innerHTML = `<h1>Loading ${pageTitle}...</h1>`;
+        mainContent.innerHTML = `<h1>Loading ${escapeHtml(pageTitle)}...</h1>`;
     }
 
     let textContent;
@@ -84,7 +108,7 @@ async function loadPage(pageName, options = {}) {
     const devotionInputs = ['furyPoints', 'faithPoints', 'disciplinePoints'];
     const devotionPoints = {};
     devotionInputs.forEach(id => {
-        devotionPoints[id] = parseInt(sessionStorage.getItem(id), 10) || 0;
+        devotionPoints[id] = parseNonNegativeInt(sessionStorage.getItem(id));
     });
     extraContextForParser.devotionPoints = devotionPoints;
 
@@ -161,7 +185,7 @@ async function loadPage(pageName, options = {}) {
                 // Only suggest if the match is reasonably close.
                 const threshold = Math.max(2, Math.floor(query.length / 3));
                 if (bestMatch && minDistance <= threshold) {
-                    suggestionHtml = `<div class="search-suggestion">Did you mean: <a href="${buildPageHref('Search', { q: bestMatch.name })}">${bestMatch.name}</a>?</div>`;
+                    suggestionHtml = `<div class="search-suggestion">Did you mean: <a href="${buildPageHref('Search', { q: bestMatch.name })}">${escapeHtml(bestMatch.name)}</a>?</div>`;
                     const suggestedTerms = bestMatch.name.toLowerCase().split(' ').filter(t => t.length > 0);
                     filtered = searchIndex.filter(item => {
                         const currentItemName = item.name.toLowerCase();
@@ -174,9 +198,9 @@ async function loadPage(pageName, options = {}) {
             if (filtered.length > 0) {
                 filtered.forEach(item => {
                     const iconHtml = item.icon
-                        ? `<img src="${item.icon}" alt="" class="search-result-icon" onerror="this.style.display='none'">`
+                        ? `<img src="${item.icon}" alt="" class="search-result-icon" data-hide-on-error="true">`
                         : '';
-                    resultsHtml += `<li>${iconHtml}<a href="${item.url}">${item.name}</a>${item.intrinsicAffixesHtml || ''}</li>`;
+                    resultsHtml += `<li>${iconHtml}<a href="${item.url}">${escapeHtml(item.name)}</a>${item.intrinsicAffixesHtml || ''}</li>`;
                 });
             } else {
                 resultsHtml += '<li>No results found.</li>';
@@ -185,9 +209,10 @@ async function loadPage(pageName, options = {}) {
 
             mainContent.innerHTML = `
                 <div class="page-header">
-                    <h1>${pageTitle}</h1>
+                    <h1>${escapeHtml(pageTitle)}</h1>
                 </div>
                 <div id="pageContent">${suggestionHtml}${resultsHtml}</div>`;
+            bindImageErrorHandlers(mainContent);
 
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
@@ -214,14 +239,12 @@ async function loadPage(pageName, options = {}) {
             pageTitle = itemTitle; // Update page title to just be the item name
             extraContextForParser.itemTitle = itemTitle;
 
-            let dynamicTemplatePath;
-            if (itemType === 'relics') {
-                dynamicTemplatePath = 'Pages/dynamic/relic.ejs';
-            } else if (itemType === 'treasure_classes') {
-                dynamicTemplatePath = 'Pages/dynamic/treasure_class.ejs';
-            } else if (itemType === 'dungeons') {
-                dynamicTemplatePath = 'Pages/dynamic/dungeon.ejs';
-            }
+            const templatePathByItemType = {
+                relics: 'Pages/dynamic/relic.ejs',
+                treasure_classes: 'Pages/dynamic/treasure_class.ejs',
+                dungeons: 'Pages/dynamic/dungeon.ejs',
+            };
+            const dynamicTemplatePath = templatePathByItemType[itemType];
 
             if (dynamicTemplatePath) {
                 const templateResponse = await fetch(dynamicTemplatePath);
@@ -249,6 +272,7 @@ async function loadPage(pageName, options = {}) {
             // Soft update: only replace the content div
             pageContentEl.innerHTML = parsedHtml;
             pageContentEl.style.opacity = '1';
+            bindImageErrorHandlers(pageContentEl);
 
             if (activeElementId) {
                 const newActiveElement = document.getElementById(activeElementId);
@@ -263,10 +287,11 @@ async function loadPage(pageName, options = {}) {
             // Hard update: replace the whole main content area
             mainContent.innerHTML = `
                 <div class="page-header">
-                    <h1>${pageTitle}</h1>
+                    <h1>${escapeHtml(pageTitle)}</h1>
                     <button id="viewSourceBtn" class="tool-button">View Source</button>
                 </div>
                 <div id="pageContent">${parsedHtml}</div>`;
+            bindImageErrorHandlers(mainContent);
 
             document.getElementById('viewSourceBtn').addEventListener('click', () => {
                 const pageContent = document.getElementById('pageContent');
@@ -277,6 +302,7 @@ async function loadPage(pageName, options = {}) {
                     btn.textContent = 'View Page';
                 } else {
                     pageContent.innerHTML = parsedHtml;
+                    bindImageErrorHandlers(pageContent);
                     btn.textContent = 'View Source';
                 }
             });
@@ -288,8 +314,8 @@ async function loadPage(pageName, options = {}) {
         console.error('Failed to load page:', error);
         mainContent.innerHTML = `
             <h1>Error</h1>
-            <p>Could not load page '<strong>${pageTitle}</strong>'.</p>
-            <p>Please check that the URL is correct and that a corresponding item exists or a manual page has been created at <code>/Pages/${pageName}.txt</code>.</p>
+            <p>Could not load page '<strong>${escapeHtml(pageTitle)}</strong>'.</p>
+            <p>Please check that the URL is correct and that a corresponding item exists or a manual page has been created at <code>/Pages/${escapeHtml(pageName)}.txt</code>.</p>
         `;
     }
 }
@@ -313,7 +339,9 @@ function setupDevotionListeners() {
             if (savedValue !== null) input.value = savedValue;
 
             input.addEventListener('input', (event) => {
-                sessionStorage.setItem(id, event.target.value);
+                const sanitizedValue = String(parseNonNegativeInt(event.target.value));
+                event.target.value = sanitizedValue;
+                sessionStorage.setItem(id, sanitizedValue);
                 debouncedLoadPageForDevotion();
             });
         }

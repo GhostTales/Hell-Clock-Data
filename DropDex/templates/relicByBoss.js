@@ -1,7 +1,113 @@
-import { getGameData } from '../data.js';
-import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap } from './utils.js';
-import { dungeonToBossTCs, nightmareRelicBossTCs } from './dungeonBossMap.js';
+import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap, getDevotionBonusContext } from './utils.js';
 import { buildPageHref } from '../routes.js';
+
+function getDungeonActNumber(dungeonName) {
+    const match = dungeonName.match(/^Act(\d{2})_/);
+    return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function createBlessingTcResolver(allTreasureClasses) {
+    const blessingTcNames = allTreasureClasses
+        .filter(tc => tc && tc.type === 'BlessingLootTreasureClass' && typeof tc.name === 'string')
+        .map(tc => tc.name);
+
+    const nameSet = new Set(blessingTcNames);
+
+    const findActSpecific = (patternBuilder) => {
+        const byAct = new Map();
+        blessingTcNames.forEach((name) => {
+            const match = name.match(patternBuilder);
+            if (match) {
+                byAct.set(Number.parseInt(match[1], 10), name);
+            }
+        });
+        return byAct;
+    };
+
+    const nightmareByAct = findActSpecific(/^Act\s+(\d+)\s+Season of Nightmares Relic Blessing Treasure Class$/);
+    const abyssByAct = findActSpecific(/^Act\s+(\d+)\s+ABYSS Boss Blessing Treasure Class$/);
+    const hellModeByAct = findActSpecific(/^Act\s+(\d+)\s+Hell Mode Boss Blessing Treasure Class$/);
+
+    const actNormalBossTcs = new Map();
+    blessingTcNames.forEach((name) => {
+        const actMatch = name.match(/^Act\s+(\d+)\s+/);
+        if (!actMatch) return;
+        if (!name.endsWith('Boss Blessing Treasure Class')) return;
+        if (name.includes('Hell Mode') || name.includes('ABYSS') || name.includes('OBLIVION') || name.includes('Season of Nightmares') || name.includes('PLUS')) {
+            return;
+        }
+        const act = Number.parseInt(actMatch[1], 10);
+        if (!actNormalBossTcs.has(act)) {
+            actNormalBossTcs.set(act, []);
+        }
+        actNormalBossTcs.get(act).push(name);
+    });
+
+    for (const list of actNormalBossTcs.values()) {
+        list.sort();
+    }
+
+    const findNearestByAct = (actMap, act) => {
+        if (act === null) return [];
+        for (let current = act; current >= 1; current -= 1) {
+            const name = actMap.get(current);
+            if (name) return [name];
+        }
+        return [];
+    };
+
+    const nightmareOther = nameSet.has('Endgame Season of Nightmares Relic Blessing Treasure Class')
+        ? ['Endgame Season of Nightmares Relic Blessing Treasure Class']
+        : [];
+
+    const oblivionShared = nameSet.has('Act X OBLIVION Boss Blessing Treasure Class')
+        ? ['Act X OBLIVION Boss Blessing Treasure Class']
+        : [];
+
+    function getNightmareRelicBlessingTcsForDungeon(dungeonName) {
+        const act = getDungeonActNumber(dungeonName);
+        const isNormalCampaign = /^Act\d{2}_DungeonConfig$/.test(dungeonName);
+
+        if (isNormalCampaign && act !== null && nightmareByAct.has(act)) {
+            return [nightmareByAct.get(act)];
+        }
+        return nightmareOther;
+    }
+
+    function getStandardRelicBlessingTcsForDungeon(dungeonName) {
+        const act = getDungeonActNumber(dungeonName);
+
+        if (dungeonName.startsWith('Nightmare')) {
+            if (dungeonName.includes('Oblivion') || dungeonName.includes('Void')) {
+                return oblivionShared;
+            }
+            return findNearestByAct(abyssByAct, 4);
+        }
+
+        if (dungeonName.includes('_Oblivion') || dungeonName.includes('_Void')) {
+            return oblivionShared;
+        }
+
+        if (dungeonName.includes('_Abyss')) {
+            return findNearestByAct(abyssByAct, act);
+        }
+
+        if (dungeonName.includes('_Endgame_')) {
+            return findNearestByAct(hellModeByAct, act);
+        }
+
+        if (/^Act\d{2}_DungeonConfig$/.test(dungeonName)) {
+            return actNormalBossTcs.get(act) || [];
+        }
+
+        return [];
+    }
+
+    return {
+        getNightmareRelicBlessingTcsForDungeon,
+        getStandardRelicBlessingTcsForDungeon,
+    };
+}
 
 /**
  * Creates an HTML table row for a dungeon's boss drops.
@@ -217,22 +323,13 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
         return '<span class="error">[Relic not found]</span>';
     }
 
-    const furyPoints = devotionPoints.furyPoints || 0;
-    const faithPoints = devotionPoints.faithPoints || 0;
-    const disciplinePoints = devotionPoints.disciplinePoints || 0;
-
-    const devotions = { "Fury": furyPoints, "Faith": faithPoints, "Discipline": disciplinePoints };
-    const maxDevotion = Math.max(...Object.values(devotions));
-    const highestDevotions = Object.keys(devotions).filter(key => devotions[key] === maxDevotion);
-    
-    let devotionBonus = 1;
-    let highestDevotionType = null;
-
-    if (highestDevotions.length === 1 && maxDevotion > 4) {
-        highestDevotionType = highestDevotions[0];
-        const amount_points = maxDevotion - 4;
-        devotionBonus = 2 + 0.1 * amount_points;
-    }
+    const {
+        devotions,
+        maxDevotion,
+        highestDevotions,
+        highestDevotionType,
+        devotionBonus,
+    } = getDevotionBonusContext(devotionPoints);
 
     const devotionData = { devotions, devotionColorMap, highestDevotionType, devotionBonus };
 
@@ -241,6 +338,7 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
     const endlessDungeonRows = [];
     const ascensionDungeonRows = [];
     const campaignRegex = /^Act\d{2}_DungeonConfig$/;
+    const blessingTcResolver = createBlessingTcResolver(allTreasureClasses);
 
     // Loop through all dungeons to find and categorize boss drops
     for (const dungeon of allDungeons) {
@@ -248,22 +346,9 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
         // Override for "Nightmare" type relics, which use special Treasure Classes.
         // The relic type is stored in the `relicTypes` array.
         if (relic.relicTypes && relic.relicTypes.includes('Nightmare')) {
-            bossTcNames = [];
-            const isNormalCampaign = campaignRegex.test(dungeon.name);
-
-            if (isNormalCampaign) {
-                const actMatch = dungeon.name.match(/^Act(\d{2})/);
-                if (actMatch) {
-                    const actKey = `Act${actMatch[1]}`;
-                    if (nightmareRelicBossTCs.campaign[actKey]) {
-                        bossTcNames.push(nightmareRelicBossTCs.campaign[actKey]);
-                    }
-                }
-            } else { // Everything else (Endless, Ascension, other campaign difficulties)
-                bossTcNames.push(nightmareRelicBossTCs.other);
-            }
+            bossTcNames = blessingTcResolver.getNightmareRelicBlessingTcsForDungeon(dungeon.name);
         } else {
-            bossTcNames = dungeonToBossTCs[dungeon.name] || [];
+            bossTcNames = blessingTcResolver.getStandardRelicBlessingTcsForDungeon(dungeon.name);
         }
         let foundBossDrops = [];
 

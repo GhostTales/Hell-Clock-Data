@@ -1,10 +1,12 @@
 import { getGameData } from './data.js';
 import { getEnLoc } from './templates.js';
 import { formatAffixDescription } from './templates/formatters.js';
-import { nonUniqueRelicIconMap } from './templates/utils.js';
+import { getRelicIconUrl } from './templates/utils.js';
 import { buildPageHref } from './routes.js';
 
 let searchIndex = null;
+let searchIndexTimestamp = 0;
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Builds a plain-text, lowercased blob of an intrinsic affix's name and
@@ -42,26 +44,12 @@ function getIntrinsicAffixesHtml(affixes, allAffixData) {
 }
 
 /**
- * Resolves the icon URL for a relic, falling back to the manual non-unique icon map.
- * @param {object} relic - The relic data object.
- * @returns {string|null} The icon URL, or null if none could be resolved.
- */
-function getRelicIconUrl(relic) {
-    let spriteNames = relic.sprite;
-    if (!spriteNames && nonUniqueRelicIconMap[relic.name]) {
-        spriteNames = nonUniqueRelicIconMap[relic.name];
-    }
-    if (!spriteNames) return null;
-    const spriteName = Array.isArray(spriteNames) ? spriteNames[0] : spriteNames;
-    return `https://raw.githubusercontent.com/RogueSnail/hellclock-data-export/main/icons/${spriteName}.png`;
-}
-
-/**
  * Builds the search index from game data. Caches the result.
  * @returns {Promise<Array<{name: string, url: string}>>} The search index.
  */
 export async function buildSearchIndex() {
-    if (searchIndex) {
+    const now = Date.now();
+    if (searchIndex && (now - searchIndexTimestamp) < SEARCH_CACHE_TTL_MS) {
         return searchIndex;
     }
 
@@ -140,6 +128,7 @@ export async function buildSearchIndex() {
     }
 
     searchIndex = index;
+    searchIndexTimestamp = now;
     return searchIndex;
 }
 

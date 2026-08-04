@@ -1,5 +1,5 @@
-<% const safeTitle = itemTitle.replace(/'/g, "\\'"); %>
-<% const tc = allTCs.find(t => t.name.toLowerCase() === safeTitle.toLowerCase()); %>
+<% const normalizedTitle = String(itemTitle || '').toLowerCase(); %>
+<% const tc = allTCs.find(t => t.name.toLowerCase() === normalizedTitle); %>
 <% if (tc) { %>
     <%- await createTreasureClassTemplate(tc, allTCs, allRelics) %>
     <%- await createDungeonListTemplate(allDungeons, tc) %>

@@ -1,5 +1,4 @@
-import { getGameData } from '../data.js';
-import { getEnLoc, nonUniqueRelicIconMap, devotionColorMap, relicSizeMap } from './utils.js';
+import { getEnLoc, getRelicSpriteNames, devotionColorMap, relicSizeMap } from './utils.js';
 import { formatAffixDescription } from './formatters.js';
 
 /**
@@ -17,10 +16,7 @@ export async function createRelicTemplate(relic, allAffixData, allSkillsData) {
     const name = getEnLoc(relic.nameLocalizationKey) || relic.name;
     const lore = getEnLoc(relic.loreLocalizationKey);
 
-    let spriteNames = relic.sprite;
-    if (!spriteNames && nonUniqueRelicIconMap[relic.name]) {
-        spriteNames = nonUniqueRelicIconMap[relic.name];
-    }
+    const spriteNames = getRelicSpriteNames(relic);
 
     let iconContainerHtml = '';
     if (spriteNames) {
@@ -28,7 +24,7 @@ export async function createRelicTemplate(relic, allAffixData, allSkillsData) {
         let imagesHtml = '';
         spriteNameArray.forEach(spriteName => {
             const iconPath = `https://raw.githubusercontent.com/RogueSnail/hellclock-data-export/main/icons/${spriteName}.png`;
-            imagesHtml += `<img src="${iconPath}" alt="${name}" style="width: 128px; height: 128px;" onerror="this.style.display='none'"> `;
+            imagesHtml += `<img src="${iconPath}" alt="${name}" style="width: 128px; height: 128px;" data-hide-on-error="true"> `;
         });
         iconContainerHtml = `<div class="infobox-image" style="text-align: center; padding: 10px 0;">${imagesHtml.trim()}</div>`;
     }
