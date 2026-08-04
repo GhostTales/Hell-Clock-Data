@@ -280,7 +280,6 @@ function renderWelcome(loadedFileCount) {
     content.innerHTML = `
         <h1>Welcome to the Technical Wiki</h1>
         <p>Select an entry from the sidebar to inspect the official Hell Clock export data.</p>
-        <p>Loaded datasets: <strong>${summary.loadedFiles}</strong> (remote official export)</p>
         ${renderLastUpdatedSection('welcome')}
     `;
 }
