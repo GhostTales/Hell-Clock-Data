@@ -1,6 +1,59 @@
 import { getEnLoc } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
+function toTreasureClassLink(tcLike, allTCs) {
+    if (!tcLike) {
+        return 'Unknown';
+    }
+
+    const resolvedTc = tcLike.id !== undefined
+        ? allTCs.find(t => t.id === tcLike.id)
+        : null;
+    const tcName = resolvedTc?.name || tcLike.name || 'Unknown';
+    const encodedName = encodeURIComponent(tcName);
+    return `<a href="${buildPageHref(`treasure_classes/${encodedName}`)}">${tcName}</a>`;
+}
+
+function getConditionText(conditionConfigList) {
+    const conditions = conditionConfigList?.conditionsConfigList;
+    if (!Array.isArray(conditions) || conditions.length === 0) {
+        return 'Always';
+    }
+
+    return conditions
+        .map((c) => {
+            const left = c.condition || 'Condition';
+            const right = c.targetValue ? `: ${c.targetValue}` : '';
+            return `${left}${right}`;
+        })
+        .join(', ');
+}
+
+function getConditionalGroupsText(conditionGroups) {
+    const groups = conditionGroups?.conditionGroups;
+    if (!Array.isArray(groups) || groups.length === 0) {
+        return 'Always';
+    }
+
+    return groups
+        .map((group) => {
+            const conditions = Array.isArray(group.conditionsConfigList)
+                ? group.conditionsConfigList
+                : [];
+            if (conditions.length === 0) {
+                return 'Always';
+            }
+            return conditions
+                .map((c) => {
+                    const left = c.condition || 'Condition';
+                    const right = c.targetValue ? `: ${c.targetValue}` : '';
+                    return `${left}${right}`;
+                })
+                .join(' + ');
+        })
+        .join(' OR ');
+}
+
 /**
  * Creates an HTML template for a Treasure Class.
  * @param {object} tc - The Treasure Class data object.
@@ -54,6 +107,53 @@ export async function createTreasureClassTemplate(tc, allTCs, allRelics) {
         dropsHtml += '</tbody></table>';
     }
 
+    if (Array.isArray(tc.treasureClassPool) && tc.treasureClassPool.length > 0) {
+        dropsHtml += '<h4>Treasure Class Pool</h4>';
+        dropsHtml += '<table class="relic-list-table"><thead><tr><th>Conditions</th><th>Weight</th><th>Treasure Class</th></tr></thead><tbody>';
+        for (const poolEntry of tc.treasureClassPool) {
+            const conditionText = getConditionText(poolEntry.conditionConfigList);
+            const poolItems = Array.isArray(poolEntry.availableTreasureClasses)
+                ? poolEntry.availableTreasureClasses
+                : [];
+
+            if (poolItems.length === 0) {
+                dropsHtml += `<tr><td>${conditionText}</td><td>N/A</td><td>Empty Pool</td></tr>`;
+                continue;
+            }
+
+            for (const item of poolItems) {
+                const subTc = item.value?.treasureClass || item.value;
+                const subTcLink = toTreasureClassLink(subTc, allTCs);
+                dropsHtml += `<tr><td>${conditionText}</td><td>${item.weight.toFixed(1)}</td><td>${subTcLink}</td></tr>`;
+            }
+        }
+        dropsHtml += '</tbody></table>';
+    }
+
+    if (Array.isArray(tc.conditionalTreasureClasses?.list) && tc.conditionalTreasureClasses.list.length > 0) {
+        dropsHtml += '<h4>Conditional Treasure Classes</h4>';
+        dropsHtml += '<table class="relic-list-table"><thead><tr><th>Conditions</th><th>Weight</th><th>Treasure Class</th><th>Amount Limit</th></tr></thead><tbody>';
+        for (const conditionalEntry of tc.conditionalTreasureClasses.list) {
+            const conditionText = getConditionalGroupsText(conditionalEntry.conditionGroups);
+            const conditionalItems = Array.isArray(conditionalEntry.value) ? conditionalEntry.value : [];
+
+            if (conditionalItems.length === 0) {
+                dropsHtml += `<tr><td>${conditionText}</td><td>N/A</td><td>Empty List</td><td>N/A</td></tr>`;
+                continue;
+            }
+
+            for (const item of conditionalItems) {
+                const subTc = item.value?.treasureClass || item.value;
+                const subTcLink = toTreasureClassLink(subTc, allTCs);
+                const amountLimit = item.value?.useLimit
+                    ? `${item.value.amountLimit[0]} - ${item.value.amountLimit[1]}`
+                    : 'N/A';
+                dropsHtml += `<tr><td>${conditionText}</td><td>${item.weight.toFixed(1)}</td><td>${subTcLink}</td><td>${amountLimit}</td></tr>`;
+            }
+        }
+        dropsHtml += '</tbody></table>';
+    }
+
     if (tc.availableGear && tc.availableGear.length > 0) {
         dropsHtml += '<h4>Available Gear</h4>';
         dropsHtml += '<table class="relic-list-table"><thead><tr><th>Weight</th><th>Gear</th><th>Slot</th><th>Tier</th></tr></thead><tbody>';
@@ -66,6 +166,7 @@ export async function createTreasureClassTemplate(tc, allTCs, allRelics) {
     }
     
     if (tc.availableCurrencies && tc.availableCurrencies.length > 0) {
+        dropsHtml += '<h4>Available Currencies</h4>';
         dropsHtml += '<table class="relic-list-table"><thead><tr><th>Weight</th><th>Currency</th></tr></thead><tbody>';
         for (const item of tc.availableCurrencies) {
             const currencyName = item.value.currencyDefinition.name;

@@ -1,4 +1,4 @@
-import { DungeonConfigNameShorthandMap } from './utils.js';
+import { DungeonConfigNameShorthandMap, getFloorTreasureClassRefs } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
 /**
@@ -23,34 +23,13 @@ export async function createDungeonListTemplate(allDungeons, targetTc) {
         // Dungeons reference treasure classes via dropBalance.floorDropConfigs
         if (dungeon.dropBalance && Array.isArray(dungeon.dropBalance.floorDropConfigs)) {
             for (const floorConfig of dungeon.dropBalance.floorDropConfigs) {
-                // Check direct TC references
-                const directTcRefs = {
-                    "Regular Enemy": floorConfig.regularEnemyTreasureClass,
-                    "Champion Enemy": floorConfig.championEnemyTreasureClass,
-                    "Rare Enemy": floorConfig.rareEnemyTreasureClass,
-                    "Unique Enemy": floorConfig.uniqueEnemyTreasureClass,
-                    "Boss": floorConfig.bossTreasureClass,
-                    "Breakable": floorConfig.breakableTreasureClass,
-                    "Basic Gear": floorConfig.basicGearTreasureClass,
-                    "Blessed Gear": floorConfig.blessedGearTreasureClass,
-                    "Relic": floorConfig.relicTreasureClass,
-                    "Unique Relic": floorConfig.uniqueRelicTreasureClass,
-                };
+                // Use the shared helper so source mapping stays in sync with dungeon page logic.
+                const directTcRefs = getFloorTreasureClassRefs(floorConfig);
 
                 for (const source in directTcRefs) {
                     const tc = directTcRefs[source];
                     if (tc && (tc.id === targetTc.id || (tc.name && tc.name.toLowerCase() === targetTc.name.toLowerCase()))) {
                         sources.add(source);
-                    }
-                }
-
-                // Check chest treasure classes, which is an object, not an array
-                if (floorConfig.chestTreasureClass && typeof floorConfig.chestTreasureClass === 'object') {
-                    for (const chestType in floorConfig.chestTreasureClass) {
-                        const tc = floorConfig.chestTreasureClass[chestType];
-                        if (tc && (tc.id === targetTc.id || (tc.name && tc.name.toLowerCase() === targetTc.name.toLowerCase()))) {
-                            sources.add(`${chestType} Chest`);
-                        }
                     }
                 }
             }
