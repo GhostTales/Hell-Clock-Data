@@ -1,4 +1,6 @@
 import json
+import re
+from pathlib import Path
 
 
 def load_config(filepath):
@@ -6,28 +8,56 @@ def load_config(filepath):
         return json.load(f)
 
 
-def calculate_pool_probabilities(pool_data):
-    """Calculates the percentage chance for each item in a specific pool."""
+def extract_affix_id(value):
+    """Extract the affix ID from the exported '[290]=>NULL(NULL)' format."""
+    if isinstance(value, dict):
+        return value.get('id')
+
+    if isinstance(value, str):
+        match = re.match(r'\[(\d+)\]', value)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
+def load_affix_lookup(inventory_filepath):
+    """Load Relic Affixes.json from the same directory as the inventory config."""
+    affix_filepath = Path(inventory_filepath).parent / 'Relic Affixes.json'
+
+    affix_data = load_config(affix_filepath)
+
+    return {
+        affix['id']: affix
+        for affix in affix_data['Relic Affixes']
+    }
+
+
+def calculate_pool_probabilities(pool_data, affixes_by_id):
+    """Calculate the percentage chance for each item in a pool."""
     total_weight = sum(item['weight'] for item in pool_data)
 
     if total_weight == 0:
         return []
 
     results = []
+
     for item in pool_data:
-        affix = item['value']
-        chance = (item['weight'] / total_weight) * 100
+        affix_id = extract_affix_id(item['value'])
+        affix = affixes_by_id.get(affix_id, {})
+
         results.append({
-            'id': affix.get('id'),
-            'name': affix.get('name'),
+            'id': affix_id,
+            'name': affix.get('name', f'Unknown Affix {affix_id}'),
             'weight': item['weight'],
-            'chance_percent': chance
+            'chance_percent': (item['weight'] / total_weight) * 100
         })
+
     return results
 
 
-def get_affix_chance_by_id(config_data, target_id):
-    """Finds a specific affix ID across all sizes and categories and returns its roll chance."""
+def get_affix_chance_by_id(config_data, affixes_by_id, target_id):
+    """Find a specific affix ID across all sizes and categories."""
     results = []
     size_configs = config_data.get('relicSizeConfigs', {})
 
@@ -35,26 +65,27 @@ def get_affix_chance_by_id(config_data, target_id):
         affix_pools = size_data.get('implicitAffixPool', {})
 
         for category_name, pool in affix_pools.items():
-            # Check if target ID exists in this pool
-            if any(item['value'].get('id') == target_id for item in pool):
-                pool_probs = calculate_pool_probabilities(pool)
-                # Extract the specific item
-                for prob in pool_probs:
-                    if prob['id'] == target_id:
-                        results.append({
-                            'size': size_name,
-                            'category': category_name,
-                            'name': prob['name'],
-                            'chance_percent': prob['chance_percent']
-                        })
+            pool_probs = calculate_pool_probabilities(pool, affixes_by_id)
+
+            for prob in pool_probs:
+                if prob['id'] == target_id:
+                    results.append({
+                        'size': size_name,
+                        'category': category_name,
+                        'id': prob['id'],
+                        'name': prob['name'],
+                        'weight': prob['weight'],
+                        'chance_percent': prob['chance_percent']
+                    })
+
     return results
 
 
-def get_affix_chances_by_category(config_data, size, category):
-    """Returns the roll chance for all affixes within a specific size and category pool."""
+def get_affix_chances_by_category(config_data, affixes_by_id, size, category):
+    """Return roll chances for all affixes in a specific pool."""
     try:
         pool = config_data['relicSizeConfigs'][size]['implicitAffixPool'][category]
-        return calculate_pool_probabilities(pool)
+        return calculate_pool_probabilities(pool, affixes_by_id)
     except KeyError:
         print(f"Error: Size '{size}' or Category '{category}' not found.")
         return []
@@ -62,29 +93,35 @@ def get_affix_chances_by_category(config_data, size, category):
 
 # --- Execution ---
 if __name__ == "__main__":
-    # Ensure the JSON file is in the same directory or provide the full path
-    filepath = 'json_data/relic_data/Relic Inventory Config.json'
+    filepath = 'hellclock-data-export-main/hellclock-data-export-main/data/Relic Inventory Config.json'
 
     try:
         data = load_config(filepath)
-
-        # Example 1: Query by specific Affix ID
-        test_id = 290  # Bombardment Plus 1 Affix
-        print(f"--- Probabilities for Affix ID: {test_id} ---")
-        id_results = get_affix_chance_by_id(data, test_id)
-        for res in id_results:
-            print(
-                f"Size: {res['size']:<10} | Category: {res['category']:<10} | Chance: {res['chance_percent']:.2f}% | Name: {res['name']}")
-
-        print("\n" + "=" * 50 + "\n")
+        affixes_by_id = load_affix_lookup(filepath)
 
         # Example 2: Query all affixes in a specific Size and Category
-        test_size = "Small"
+        test_size = "Large"
         test_category = "Corrupted"
-        print(f"--- All Affix Probabilities for {test_size} / {test_category} ---")
-        category_results = get_affix_chances_by_category(data, test_size, test_category)
-        for res in category_results:
-            print(f"ID: {res['id']:<4} | Chance: {res['chance_percent']:>5.2f}% | Name: {res['name']}")
 
-    except FileNotFoundError:
-        print(f"Failed to find file at {filepath}. Check the path and try again.")
+        print(f"--- All Affix Probabilities for {test_size} ---")
+
+        category_results = get_affix_chances_by_category(
+            data,
+            affixes_by_id,
+            test_size,
+            test_category
+        )
+
+        for res in category_results:
+            print(
+                f"ID: {res['id']:<4} | "
+                f"Weight: {res['weight']:<6} | "
+                f"Chance: {res['chance_percent']:>6.2f}% | "
+                f"Name: {res['name']}"
+            )
+
+    except FileNotFoundError as e:
+        print(f"Failed to find required file: {e}")
+
+    except KeyError as e:
+        print(f"Unexpected JSON structure. Missing key: {e}")
