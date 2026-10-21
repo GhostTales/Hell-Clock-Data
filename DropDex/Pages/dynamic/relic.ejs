@@ -1,7 +1,9 @@
 <% const safeTitle = itemTitle; %>
 <% const relic = allRelics.find(r => (getEnLoc(r.nameLocalizationKey) || r.name).toLowerCase() === safeTitle.toLowerCase()); %>
 <% if (relic) { %>
-    <%- await createRelicTemplate(relic, allAffixData, allSkills) %>    
+    <%- await createRelicTemplate(relic, allAffixData, allSkills) %>
+    <%- await createConstellationNodesTemplate(relic, allAffixData, allConstellations, groupedDevotionConfig, allStats) %>
+    <% if (!hasConstellationNodeAffix(relic, allAffixData)) { %>
     <div class="devotion-section">
         <div class="devotion-container">
             <h4>Devotion Points</h4>
@@ -22,10 +24,11 @@
         <div class="devotion-explainer">
             <h4 class="accordion-toggle" onclick="toggleAccordion('devotion-details', this)" data-alternate-text="How does devotion work? &#9652;">How does devotion work? &#9662;</h4>
             <div id="devotion-details" class="collapsible-content" style="display: none;">
-                <p>Having a high amount in a single devotion (Fury, Faith, or Discipline) can increase the drop chance of relics that share that affinity. If there is a single highest devotion (no ties) and the point value is greater than 4, a bonus is applied. The "Your Chance" column in the tables below will update to reflect this bonus.</p>
+                <p>Having 4 or more points in a devotion (Fury, Faith, or Discipline) increases the drop chance of relics that share that affinity (2x at 4 points, plus 0.1x per extra point). Relics with several affinities use the best of their multipliers. The "Your Chance" column in the tables below will update to reflect this bonus.</p>
             </div>
         </div>
     </div>
+    <% } %>
     <div class="relic-page-main-content">
         <%- await createRelicByBossTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %>
 <!--         <%- await createRelicInDungeonTemplate(relic, allDungeons, allTCs, allRelics, devotionPoints) %>  -->   

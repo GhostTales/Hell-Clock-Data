@@ -1,0 +1,3 @@
+<p>Relics from the Season of Miracles. Manifested Miracle relics force a random key node of a constellation to be active, and the Miracle Droplet copies the affixes of another unique relic.</p>
+
+<%- await createRelicListTemplate(allRelics, allAffixData, { keys: ['icon', 'name', 'eRelicSize', 'devotionAffinity', 'intrinsicAffixes'], miracle: true }) %>

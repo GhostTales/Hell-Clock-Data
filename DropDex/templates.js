@@ -1,4 +1,5 @@
 export { createAllDungeonsListTemplate } from './templates/allDungeonsList.js';
+export { createConstellationNodesTemplate, hasConstellationNodeAffix } from './templates/constellationNodes.js';
 export { createDungeonTemplate } from './templates/dungeon.js';
 export { createDungeonListTemplate } from './templates/dungeonList.js';
 export { createRelicInDungeonTemplate } from './templates/relicInDungeon.js';

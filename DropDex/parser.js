@@ -19,6 +19,10 @@ export async function parseContent(textContent, extraContext = {}) {
     const allTCs = await readArrayData('Treasure Class.json');
     const allDungeons = await readArrayData('Dungeons.json');
     const allSkills = await readArrayData('Skills.json');
+    const allStats = await readArrayData('Stats.json');
+    const constellationData = await getGameData('Constellations.json');
+    const allConstellations = constellationData?.constellationsDetails || [];
+    const groupedDevotionConfig = constellationData?.groupedDevotionConfig || {};
 
     const context = {
         // Pass all template functions from /templates/index.js
@@ -29,6 +33,9 @@ export async function parseContent(textContent, extraContext = {}) {
         allTCs,
         allDungeons,
         allSkills,
+        allStats,
+        allConstellations,
+        groupedDevotionConfig,
         ...extraContext,
     };
 

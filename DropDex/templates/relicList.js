@@ -2,6 +2,8 @@ import { getEnLoc, nonUniqueRelicIconMap, devotionColorMap, relicSizeMap } from 
 import { formatAffixDescription } from './formatters.js';
 import { buildPageHref } from '../routes.js';
 
+const isUniqueRelic = (r) => r.type === 'UniqueRelicBaseDefinition' || r.type === 'ReplicaUniqueRelicBaseDefinition';
+
 /**
  * Creates an HTML table for a list of relics with customizable columns.
  * @param {Array<object>} relics - The array of relic data objects.
@@ -14,13 +16,13 @@ export async function createRelicListTemplate(relics, allAffixData, options = {}
         return '<p>No relics found.</p>';
     }
 
-    const processIntrinsicAffixesList = (affixes) => {
+    const processIntrinsicAffixesList = (affixes, relic) => {
         if (!affixes || affixes.length === 0) return '';
         let html = '<ul style="margin: 0; padding-left: 20px;">';
         affixes.forEach(entry => {
              const affixDef = allAffixData.find(a => a.id === entry.id);
              if (affixDef) {
-                html += `<li>${formatAffixDescription(affixDef)}</li>`;
+                html += `<li>${formatAffixDescription(affixDef, relic)}</li>`;
              } else {
                 html += `<li>${entry.name} (ID: ${entry.id}) - <span class="error">Def not found</span></li>`;
              }
@@ -29,7 +31,7 @@ export async function createRelicListTemplate(relics, allAffixData, options = {}
         return html;
     };
 
-    const { keys = [], unique, nonUnique, uber, nightmare, ids } = options;
+    const { keys = [], unique, nonUnique, uber, nightmare, miracle, ids } = options;
 
     let filteredRelics = [...relics];
 
@@ -46,18 +48,21 @@ export async function createRelicListTemplate(relics, allAffixData, options = {}
     if (nightmare) {
         filteredRelics = filteredRelics.filter(r => r.relicTypes && Array.isArray(r.relicTypes) && r.relicTypes.includes('Nightmare'));
     }
+    if (miracle) {
+        filteredRelics = filteredRelics.filter(r => r.relicTypes && Array.isArray(r.relicTypes) && r.relicTypes.includes('Miracle'));
+    }
     if (unique) {
-        filteredRelics = filteredRelics.filter(r => r.type === 'UniqueRelicBaseDefinition');
+        filteredRelics = filteredRelics.filter(r => isUniqueRelic(r));
     }
     if (nonUnique) {
-        filteredRelics = filteredRelics.filter(r => r.type !== 'UniqueRelicBaseDefinition');
+        filteredRelics = filteredRelics.filter(r => !isUniqueRelic(r));
     }
 
     let tableHtml = `<table class="relic-list-table">`;
     
     // Header
     tableHtml += '<thead><tr>';
-    const displayKeys = keys.filter(k => !['unique', 'nonUnique', 'uber', 'nightmare'].includes(k.toLowerCase()));
+    const displayKeys = keys.filter(k => !['unique', 'nonUnique', 'uber', 'nightmare', 'miracle'].includes(k.toLowerCase()));
 
     displayKeys.forEach(key => {
         const headerText = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
@@ -107,7 +112,9 @@ export async function createRelicListTemplate(relics, allAffixData, options = {}
                     break;
                 case 'intrinsicaffix':
                 case 'intrinsicaffixes':
-                    cellContent = processIntrinsicAffixesList(relic.intrinsicAffixes);
+                    cellContent = relic.type === 'ReplicaUniqueRelicBaseDefinition'
+                        ? 'Copies the intrinsic affixes of a random unique relic'
+                        : processIntrinsicAffixesList(relic.intrinsicAffixes, relic);
                     break;
                 case 'erelicsize':
                     cellContent = relic.eRelicSize ? relicSizeMap[relic.eRelicSize] : 'N/A';

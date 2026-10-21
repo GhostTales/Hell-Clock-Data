@@ -1,4 +1,4 @@
-import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap, getDevotionBonusContext } from './utils.js';
+import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap, getDevotionBonusContext, createDevotionModifierNote } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
 function getDungeonActNumber(dungeonName) {
@@ -169,17 +169,16 @@ function createTableHtml(title, rows, isCollapsible = false, collapseId = '') {
  * @param {Array<object>} allRelics - All relic data (needed for devotion calculations).
  * @param {object} devotions - Current devotion points.
  * @param {object} devotionColorMap - Mapping of devotion types to colors.
- * @param {string|null} highestDevotionType - The type of the highest devotion.
- * @param {number} devotionBonus - The calculated devotion bonus.
+ * @param {object} devotionModifiers - Drop weight multiplier per devotion name.
  * @returns {number} The calculated chance (as a percentage).
  */
-function getRelicDropChanceInTc(tc, relicId, allTreasureClasses, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus) {
+function getRelicDropChanceInTc(tc, relicId, allTreasureClasses, allRelics, devotions, devotionColorMap, devotionModifiers) {
     if (!tc) return 0;
 
     // Case 1: The TC directly contains relics (e.g., RelicTreasureClass, UniqueRelicTreasureClass)
     if (tc.availableRelics && tc.availableRelics.length > 0) {
         if (tc.availableRelics.some(r => r.value.id === relicId)) {
-            const modifiedRelicWeights = calculateModifiedRelicWeights(tc.availableRelics, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus);
+            const modifiedRelicWeights = calculateModifiedRelicWeights(tc.availableRelics, allRelics, devotions, devotionColorMap, devotionModifiers);
             const yourTotalWeight = modifiedRelicWeights.reduce((sum, r) => sum + r.weight, 0);
             const yourRelicWeight = modifiedRelicWeights.find(r => r.id === relicId)?.weight || 0;
             return yourTotalWeight > 0 ? (yourRelicWeight / yourTotalWeight) * 100 : 0;
@@ -196,7 +195,7 @@ function getRelicDropChanceInTc(tc, relicId, allTreasureClasses, allRelics, devo
             const subTcRef = subTcItem.value.treasureClass || subTcItem.value; // Handle slight variations in structure
             const subTc = allTreasureClasses.find(t => t.id === subTcRef?.id);
             if (subTc) {
-                const chanceInSubTc = getRelicDropChanceInTc(subTc, relicId, allTreasureClasses, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus);
+                const chanceInSubTc = getRelicDropChanceInTc(subTc, relicId, allTreasureClasses, allRelics, devotions, devotionColorMap, devotionModifiers);
                 totalWeightedChance += chanceInSubTc * subTcItem.weight;
                 totalWeight += subTcItem.weight;
             }
@@ -220,7 +219,7 @@ function getRelicDropChanceInTc(tc, relicId, allTreasureClasses, allRelics, devo
                     if (subTc.name.includes("First Time")) {
                         continue;
                     }
-                        const chanceInSubTc = getRelicDropChanceInTc(subTc, relicId, allTreasureClasses, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus);
+                        const chanceInSubTc = getRelicDropChanceInTc(subTc, relicId, allTreasureClasses, allRelics, devotions, devotionColorMap, devotionModifiers);
                         currentListWeightedChance += chanceInSubTc * subTcItem.weight;
                         currentListTotalWeight += subTcItem.weight;
                     }
@@ -253,8 +252,8 @@ function findBlessingDropsInTc(tc, relic, allTreasureClasses, allRelics, devotio
 
     // Base Case: If this TC is a BlessingLootTreasureClass, calculate its chance and return.
     if (tc.type === "BlessingLootTreasureClass") {
-        const baseChance = getRelicDropChanceInTc(tc, relic.id, allTreasureClasses, allRelics, {}, {}, null, 1);
-        const yourChance = getRelicDropChanceInTc(tc, relic.id, allTreasureClasses, allRelics, devotionData.devotions, devotionData.devotionColorMap, devotionData.highestDevotionType, devotionData.devotionBonus);
+        const baseChance = getRelicDropChanceInTc(tc, relic.id, allTreasureClasses, allRelics, {}, {}, {});
+        const yourChance = getRelicDropChanceInTc(tc, relic.id, allTreasureClasses, allRelics, devotionData.devotions, devotionData.devotionColorMap, devotionData.devotionModifiers);
 
         if (baseChance > 0) {
             let maxTier = 'N/A';
@@ -323,15 +322,9 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
         return '<span class="error">[Relic not found]</span>';
     }
 
-    const {
-        devotions,
-        maxDevotion,
-        highestDevotions,
-        highestDevotionType,
-        devotionBonus,
-    } = getDevotionBonusContext(devotionPoints);
+    const { devotions, devotionModifiers } = getDevotionBonusContext(devotionPoints);
 
-    const devotionData = { devotions, devotionColorMap, highestDevotionType, devotionBonus };
+    const devotionData = { devotions, devotionColorMap, devotionModifiers };
 
     const campaignNormalRows = [];
     const campaignOtherRows = [];
@@ -399,7 +392,7 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
 
     const allRows = [...campaignNormalRows, ...campaignOtherRows, ...endlessDungeonRows, ...ascensionDungeonRows];
     if (allRows.length === 0) {
-        return '<p>This relic does not drop from any boss blessing screens.</p>';
+        return '';
     }
 
     // Sort rows within each category
@@ -429,11 +422,7 @@ export async function createRelicByBossTemplate(relic, allDungeons, allTreasureC
     html += createTableHtml('Ascension', ascensionDungeonRows);
     html += createTableHtml('Other Campaign Dungeons', campaignOtherRows, true, 'boss-campaign-other-dungeons');
 
-    if (highestDevotionType) {
-        html += `<p style="font-size: 0.9em;"><i>Your highest devotion is ${highestDevotionType}, applying a ${devotionBonus.toFixed(2)}x weight multiplier.</i></p>`;
-    } else if (highestDevotions.length > 1 && maxDevotion > 4) {
-        html += `<p style="font-size: 0.9em;"><i>Multiple devotions are tied for the highest value, so no bonus is applied.</i></p>`;
-    }
+    html += createDevotionModifierNote(devotionModifiers);
 
     return html;
 }

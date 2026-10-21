@@ -35,7 +35,7 @@ export async function createRelicTemplate(relic, allAffixData, allSkillsData) {
         affixes.forEach(entry => {
              const affixDef = allAffixData.find(a => a.id === entry.id);
              if (affixDef) {
-                html += `<li>${formatAffixDescription(affixDef)}</li>`;
+                html += `<li>${formatAffixDescription(affixDef, relic)}</li>`;
              } else {
                 html += `<li>${entry.name} (ID: ${entry.id}) - <span class="error">Def not found</span></li>`;
              }
@@ -44,8 +44,14 @@ export async function createRelicTemplate(relic, allAffixData, allSkillsData) {
         return html;
     };
 
+    const processReplicaAffixes = () => `<h4>Intrinsic Affixes</h4>
+        <p style="margin: 4px 0;">When this relic drops, a random unique relic is picked. The droplet takes that relic's name, icon and <b>its unique affix</b>.</p>
+        <p style="margin: 4px 0;">It never copies Community, Seasonal, Journey, Uber or Small unique relics.</p>`;
+
     let affixesHtml = '';
-    affixesHtml += processIntrinsicAffixes(relic.intrinsicAffixes);
+    affixesHtml += relic.type === 'ReplicaUniqueRelicBaseDefinition'
+        ? processReplicaAffixes()
+        : processIntrinsicAffixes(relic.intrinsicAffixes);
 
     let availabilityHtml = '';
     let conditionsList = '';
@@ -66,6 +72,10 @@ export async function createRelicTemplate(relic, allAffixData, allSkillsData) {
 
     if (relic.relicTypes && Array.isArray(relic.relicTypes) && relic.relicTypes.includes('Nightmare')) {
         conditionsList += `<li>Can only be obtained from Nightmare Portals</li>`;
+    }
+
+    if (relic.relicTypes && Array.isArray(relic.relicTypes) && relic.relicTypes.includes('Miracle')) {
+        conditionsList += `<li>Only obtained through the Season of Miracles</li>`;
     }
 
     if (conditionsList) {

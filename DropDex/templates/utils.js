@@ -98,6 +98,40 @@ export function getRelicIconUrl(relic) {
     return `https://raw.githubusercontent.com/RogueSnail/hellclock-data-export/main/icons/${spriteName}.png`;
 }
 
+// Mirrors DevotionDropModifierConfig in Constellations.json (identical for Fury, Faith and Discipline).
+export const DEVOTION_DROP_MODIFIER_CONFIG = {
+    minimumPoints: 4,
+    baseModifier: 1,
+    modifierIncrementPerDevotionPoint: 0.1,
+};
+
+export function getDevotionDropModifier(points) {
+    const { minimumPoints, baseModifier, modifierIncrementPerDevotionPoint } = DEVOTION_DROP_MODIFIER_CONFIG;
+    const extraPoints = points - minimumPoints;
+    if (extraPoints < 0) return 1;
+    return 1 + baseModifier + modifierIncrementPerDevotionPoint * extraPoints;
+}
+
+/**
+ * Weight multiplier for a relic: 1 without affinity, otherwise the best modifier among its affinities.
+ * Categories without a drop modifier (e.g. Neutral) count as 1.
+ */
+export function getRelicDevotionModifier(affinity, devotionModifiers = {}, devotionColorMap = {}) {
+    const list = Array.isArray(affinity) ? affinity : (typeof affinity === 'string' ? [affinity] : []);
+    if (list.length === 0) return 1;
+    return Math.max(...list.map(a => {
+        const name = typeof a === 'string' ? devotionColorMap[a.toLowerCase()] : null;
+        return devotionModifiers[name] ?? 1;
+    }));
+}
+
+export function createDevotionModifierNote(devotionModifiers) {
+    const active = Object.entries(devotionModifiers).filter(([, mod]) => mod > 1);
+    if (active.length === 0) return '';
+    const text = active.map(([name, mod]) => `${name} ${mod.toFixed(2)}x`).join(', ');
+    return `<p style="font-size: 0.9em;"><i>Devotion weight multipliers applied to relics with a matching affinity: ${text}. Relics with several affinities use their best multiplier.</i></p>`;
+}
+
 export function getDevotionBonusContext(devotionPoints = {}) {
     const safePoints = (value) => {
         const numberValue = Number(value);
@@ -110,24 +144,14 @@ export function getDevotionBonusContext(devotionPoints = {}) {
         Discipline: safePoints(devotionPoints.disciplinePoints),
     };
 
-    const maxDevotion = Math.max(...Object.values(devotions));
-    const highestDevotions = Object.keys(devotions).filter(key => devotions[key] === maxDevotion);
-
-    let devotionBonus = 1;
-    let highestDevotionType = null;
-
-    if (highestDevotions.length === 1 && maxDevotion > 4) {
-        highestDevotionType = highestDevotions[0];
-        const extraPoints = maxDevotion - 4;
-        devotionBonus = 2 + (0.1 * extraPoints);
+    const devotionModifiers = {};
+    for (const [name, points] of Object.entries(devotions)) {
+        devotionModifiers[name] = getDevotionDropModifier(points);
     }
 
     return {
         devotions,
-        maxDevotion,
-        highestDevotions,
-        highestDevotionType,
-        devotionBonus,
+        devotionModifiers,
     };
 }
 
@@ -154,12 +178,7 @@ export function getFloorTreasureClassRefs(floorConfig) {
     return refs;
 }
 
-export function calculateModifiedRelicWeights(availableRelics, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus) {
-    // Create a reverse map for looking up color by devotion name, used for the affinity bonus.
-    const nameToColorMap = Object.fromEntries(
-        Object.entries(devotionColorMap).map(([color, name]) => [name, color])
-    );
-
+export function calculateModifiedRelicWeights(availableRelics, allRelics, devotions = {}, devotionColorMap = {}, devotionModifiers = {}) {
     return availableRelics.map(r => {
         const fullRelicData = allRelics.find(fullRelic => fullRelic.id === r.value.id);
         let currentRelicWeight = r.weight;
@@ -184,22 +203,8 @@ export function calculateModifiedRelicWeights(availableRelics, allRelics, devoti
             currentRelicWeight = 0;
         }
 
-        if (currentRelicWeight > 0 && highestDevotionType && fullRelicData) {
-            const devotionColor = nameToColorMap[highestDevotionType];
-            const affinity = fullRelicData.devotionAffinity;
-
-            if (devotionColor && affinity) {
-                let hasAffinity = false;
-                if (Array.isArray(affinity)) {
-                    hasAffinity = affinity.some(a => typeof a === 'string' && a.toLowerCase() === devotionColor);
-                } else if (typeof affinity === 'string') {
-                    hasAffinity = affinity.toLowerCase() === devotionColor;
-                }
-
-                if (hasAffinity) {
-                    currentRelicWeight *= devotionBonus;
-                }
-            }
+        if (currentRelicWeight > 0 && fullRelicData) {
+            currentRelicWeight *= getRelicDevotionModifier(fullRelicData.devotionAffinity, devotionModifiers, devotionColorMap);
         }
         return { id: r.value.id, weight: currentRelicWeight };
     });

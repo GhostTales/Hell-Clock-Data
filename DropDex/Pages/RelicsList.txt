@@ -3,6 +3,7 @@
 <ul>
     <li><a href="?p=r/Uber Relics">Uber Relics</a></li>
     <li><a href="?p=r/Nightmare Relics">Nightmare Relics</a></li>
+    <li><a href="?p=r/Miracle Relics">Miracle Relics</a></li>
     <li><a href="?p=r/Community Relics">Community Relics</a></li>
 </ul>
 

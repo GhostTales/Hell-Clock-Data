@@ -32,6 +32,10 @@
     "path": "MainPage"
   },
   {
+    "name": "Miracle Relics",
+    "path": "relics/Miracle Relics"
+  },
+  {
     "name": "Nightmare Relics",
     "path": "relics/Nightmare Relics"
   },

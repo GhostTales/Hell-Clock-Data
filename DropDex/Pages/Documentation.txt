@@ -44,6 +44,7 @@
     <li><b>nonUnique</b>: Set to <code>true</code> to show only non-unique relics.</li>
     <li><b>uber</b>: Set to <code>true</code> to filter for Uber relics.</li>
     <li><b>nightmare</b>: Set to <code>true</code> to filter for Nightmare relics.</li>
+    <li><b>miracle</b>: Set to <code>true</code> to filter for Season of Miracles relics.</li>
     <li><b>ids</b>: An array of relic IDs to display. E.g., <code>[11, 12, 23]</code>.</li>
 </ul>
 
@@ -62,6 +63,7 @@
 <h3>Single Item Info Boxes</h3>
 <p>These functions render the full detail infobox for a single item, as seen on the dynamically generated item pages.</p>
 <ul>
+    <li><code>&lt;%- await createConstellationNodesTemplate(relic, allAffixData, allConstellations, groupedDevotionConfig, allStats) %&gt;</code> - For relics with a constellation node affix (Manifested Miracles), lists every key node effect the relic can roll, with the constellation it belongs to and its chance. Renders nothing for other relics.</li>
     <li><code>&lt;%- await createRelicTemplate(relic, allAffixData, allSkills) %&gt;</code> - Renders a relic's infobox (icon, affixes, size, devotion affinity, etc.).</li>
     <li><code>&lt;%- await createTreasureClassTemplate(tc, allTCs, allRelics) %&gt;</code> - Renders a Treasure Class's infobox (contents, weights, sub-classes).</li>
     <li><code>&lt;%- await createDungeonTemplate(dungeon) %&gt;</code> - Renders a dungeon's infobox (floors and their drop configuration).</li>
@@ -96,13 +98,15 @@
 <p>Legacy links with <code>?page=</code> and long item types still work for backward compatibility.</p>
 
 <h2>Devotion Points System</h2>
-<p>In the sidebar, you can input your character's devotion points for Fury, Faith, and Discipline. These points can increase the drop chance of relics that have an affinity for your highest devotion.</p>
+<p>In the sidebar, you can input your character's devotion points for Fury, Faith, and Discipline. Each devotion with enough points increases the drop chance of relics that have an affinity for it. (Verified against the game's code: <code>ConstellationsController.GetDevotionBonusModifier</code> and <code>DevotionDropModifierConfig</code>.)</p>
 
-The calculation is as follows:
+<p>The calculation is as follows:</p>
 <ul>
-    <li>The system identifies your highest devotion (Fury, Faith, or Discipline).</li>
-    <li>If there is a single highest devotion (no ties) and the point value is greater than 4, a bonus is applied.</li>
-    <li>The bonus multiplier is calculated as <code>2 + 0.1 * (points - 4)</code>. For example, 10 points in Fury gives a <code>2 + 0.1 * (10 - 4) = 2.6x</code> multiplier.</li>
-    <li>This multiplier is applied to the weight of relics that have an affinity for your highest devotion, increasing their drop chance from treasure classes.</li>
+    <li>Every devotion is evaluated on its own. There is no "highest devotion" requirement, and ties make no difference.</li>
+    <li>A devotion with 4 or more points gives a multiplier of <code>2 + 0.1 * (points - 4)</code>. For example, 4 points gives <code>2.0x</code> and 10 points gives <code>2 + 0.1 * (10 - 4) = 2.6x</code>. With fewer than 4 points the multiplier is <code>1x</code>.</li>
+    <li>A relic without any devotion affinity (or only Neutral) is not changed.</li>
+    <li>A relic with one affinity uses the multiplier of that devotion.</li>
+    <li>A relic with several affinities uses the <b>highest</b> multiplier among its affinities (the multipliers are not added or multiplied together).</li>
+    <li>The multiplier is applied to the weight of the relic in the treasure class, increasing its drop chance.</li>
     <li>The "Your Chance" column in the tables reflects this adjusted probability.</li>
 </ul>

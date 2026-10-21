@@ -1,4 +1,4 @@
-import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap, getDevotionBonusContext, getFloorTreasureClassRefs } from './utils.js';
+import { calculateModifiedRelicWeights, DungeonConfigNameShorthandMap, devotionColorMap, getDevotionBonusContext, getFloorTreasureClassRefs, createDevotionModifierNote } from './utils.js';
 import { buildPageHref } from '../routes.js';
 
 /**
@@ -31,13 +31,7 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
         return '<span class="error">[Relic not found]</span>';
     }
 
-    const {
-        devotions,
-        maxDevotion,
-        highestDevotions,
-        highestDevotionType,
-        devotionBonus,
-    } = getDevotionBonusContext(devotionPoints);
+    const { devotions, devotionModifiers } = getDevotionBonusContext(devotionPoints);
 
     const campaignNormalRows = [];
     const campaignOtherRows = [];
@@ -68,7 +62,7 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
                                 const baseChance = baseTotalWeight > 0 ? (relicEntry.weight / baseTotalWeight) * 100 : 0;
                                 combinedBaseChance += baseChance;
 
-                                const modifiedRelicWeights = calculateModifiedRelicWeights(tc.availableRelics, allRelics, devotions, devotionColorMap, highestDevotionType, devotionBonus);
+                                const modifiedRelicWeights = calculateModifiedRelicWeights(tc.availableRelics, allRelics, devotions, devotionColorMap, devotionModifiers);
                                 const yourTotalWeight = modifiedRelicWeights.reduce((sum, r) => sum + r.weight, 0);
                                 const yourRelicWeight = modifiedRelicWeights.find(r => r.id === relic.id)?.weight || 0;
                                 const yourChance = yourTotalWeight > 0 ? (yourRelicWeight / yourTotalWeight) * 100 : 0;
@@ -177,11 +171,7 @@ export async function createRelicInDungeonTemplate(relic, allDungeons, allTreasu
         html += '</table>';
     }
     
-    if (highestDevotionType) {
-        html += `<p style="font-size: 0.9em;"><i>Your highest devotion is ${highestDevotionType}, applying a ${devotionBonus.toFixed(2)}x weight multiplier.</i></p>`;
-    } else if (highestDevotions.length > 1 && maxDevotion > 4) {
-        html += `<p style="font-size: 0.9em;"><i>Multiple devotions are tied for the highest value, so no bonus is applied.</i></p>`;
-    }
+    html += createDevotionModifierNote(devotionModifiers);
 
     return html;
 }

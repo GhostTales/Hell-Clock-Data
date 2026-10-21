@@ -1,4 +1,4 @@
-import { getEnLoc } from './utils.js';
+import { getEnLoc, devotionColorMap } from './utils.js';
 
 /**
  * Formats a numeric value from an affix roll range based on its definition.
@@ -42,10 +42,18 @@ function formatValue(val, affixDef, varDef) {
 /**
  * Processes and formats an affix description, filling in roll ranges and other variables.
  * @param {object} affixDef The affix definition object.
+ * @param {object|null} relic The relic the affix belongs to, used by affixes that depend on it.
  * @returns {string} The formatted affix description.
  */
-export function formatAffixDescription(affixDef) {
+export function formatAffixDescription(affixDef, relic = null) {
     if (!affixDef) return 'Affix definition not found.';
+
+    // The export only holds a placeholder; the real node is rolled in game when the relic drops.
+    if (affixDef.type === 'ConstellationNodeAffixDefinition') {
+        const affinity = (relic?.devotionAffinity || []).map(c => devotionColorMap[c.toLowerCase()]).filter(Boolean);
+        const category = affinity.length > 0 ? affinity.join(' / ') : 'matching';
+        return `<b>${getEnLoc(affixDef.nameLocalizationKey) || affixDef.name}</b>: forces a random key node of a ${category} constellation to be active. The node is chosen when the relic drops.`;
+    }
 
     let desc = getEnLoc(affixDef.description) || 'No description available.';
 
